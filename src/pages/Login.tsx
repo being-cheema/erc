@@ -1,17 +1,20 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
 
-const StravaIcon = () => (
+const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg
+    ref={ref}
     viewBox="0 0 24 24"
     className="w-6 h-6"
     fill="currentColor"
+    {...props}
   >
     <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
   </svg>
-);
+));
+StravaIcon.displayName = "StravaIcon";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);

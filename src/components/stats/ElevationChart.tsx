@@ -5,10 +5,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Mountain } from "lucide-react";
 import { format } from "date-fns";
 
-const ElevationChart = () => {
+interface ElevationChartProps {
+  compact?: boolean;
+}
+
+const ElevationChart = ({ compact = false }: ElevationChartProps) => {
   const { data: activities, isLoading } = useRecentActivities();
 
   if (isLoading) {
+    if (compact) {
+      return <Skeleton className="h-32 w-full rounded-lg" />;
+    }
     return (
       <Card className="border-border/50">
         <CardHeader className="pb-2">
@@ -40,6 +47,65 @@ const ElevationChart = () => {
     ? elevationData.reduce((sum, a) => sum + a.elevation, 0)
     : 0;
 
+  const chartHeight = compact ? 120 : 192;
+
+  const chartContent = hasData ? (
+    <div style={{ height: chartHeight }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={elevationData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `${value}m`}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              fontSize: "13px",
+            }}
+            formatter={(value: number) => [`${value}m`, "Elevation"]}
+            labelFormatter={(label) => `Run on ${label}`}
+          />
+          <Bar
+            dataKey="elevation"
+            fill="hsl(var(--success))"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={compact ? 30 : 40}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  ) : (
+    <div style={{ height: chartHeight }} className="flex flex-col items-center justify-center">
+      <Mountain className="w-6 h-6 text-muted-foreground mb-2" />
+      <p className="text-muted-foreground text-sm">No elevation data yet</p>
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className="bg-accent/30 rounded-lg p-3">
+        {hasData && (
+          <div className="flex justify-end mb-1">
+            <span className="text-xs text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{totalElevation}m</span>
+            </span>
+          </div>
+        )}
+        {chartContent}
+      </div>
+    );
+  }
+
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-2">
@@ -56,50 +122,7 @@ const ElevationChart = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {hasData ? (
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={elevationData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}m`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "13px",
-                  }}
-                  formatter={(value: number) => [`${value}m`, "Elevation"]}
-                  labelFormatter={(label) => `Run on ${label}`}
-                />
-                <Bar
-                  dataKey="elevation"
-                  fill="hsl(var(--success))"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="h-48 flex flex-col items-center justify-center">
-            <Mountain className="w-8 h-8 text-muted-foreground mb-2" />
-            <p className="text-muted-foreground text-sm">No elevation data yet</p>
-            <p className="text-muted-foreground text-xs mt-1">
-              Run some hills!
-            </p>
-          </div>
-        )}
+        {chartContent}
       </CardContent>
     </Card>
   );

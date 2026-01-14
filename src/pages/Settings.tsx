@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ const Settings = () => {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [monthlyGoal, setMonthlyGoal] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Fetch notification preferences
   const { data: notifications, isLoading: notificationsLoading } = useQuery({
@@ -149,6 +150,56 @@ const Settings = () => {
   const handleBackTap = () => {
     lightImpact();
     navigate(-1);
+  };
+
+  const handleForceSync = async () => {
+    if (!profile?.strava_access_token) {
+      toast.error("No Strava connection found");
+      return;
+    }
+
+    setIsSyncing(true);
+    mediumImpact();
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava?force_full_sync=true`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Sync failed");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await queryClient.invalidateQueries({ queryKey: ["monthlyActivities"] });
+      await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
+      await queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
+
+      notificationSuccess();
+      toast.success(`Synced ${result.synced || 0} activities`);
+    } catch (error: any) {
+      console.error("Force sync error:", error);
+      toast.error(error.message || "Failed to sync");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   if (profileLoading) {
@@ -351,7 +402,7 @@ const Settings = () => {
             transition={{ delay: 0.4 }}
           >
             <Card className="border-strava/30 bg-strava/5">
-              <CardContent className="p-4">
+              <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
                     <svg viewBox="0 0 24 24" className="w-6 h-6 text-strava" fill="currentColor">
@@ -365,6 +416,24 @@ const Settings = () => {
                     </p>
                   </div>
                 </div>
+
+                {/* Force Sync Button */}
+                <Button
+                  onClick={handleForceSync}
+                  disabled={isSyncing}
+                  variant="outline"
+                  className="w-full border-strava/30 hover:bg-strava/10"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  {isSyncing ? "Syncing..." : "Force Full Sync"}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Re-import all activities with detailed metrics
+                </p>
               </CardContent>
             </Card>
           </motion.div>

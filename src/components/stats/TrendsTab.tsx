@@ -1,4 +1,8 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { ChevronDown, TrendingUp, Activity, Heart, Mountain, Flame } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import WeeklyChart from "./WeeklyChart";
 import HeartRateChart from "./HeartRateChart";
 import ElevationChart from "./ElevationChart";
@@ -8,66 +12,88 @@ import DistanceProgressChart from "./DistanceProgressChart";
 import ActivityList from "./ActivityList";
 
 const TrendsTab = () => {
+  const [moreStatsOpen, setMoreStatsOpen] = useState(false);
+
   return (
     <div className="space-y-4">
-      {/* Monthly Goal Progress */}
+      {/* Primary Charts - Always Visible */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="space-y-4"
       >
+        {/* Monthly Goal Progress */}
         <DistanceProgressChart />
-      </motion.div>
 
-      {/* Weekly Distance */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
+        {/* Weekly Distance */}
         <WeeklyChart />
+
+        {/* Pace Trends - Key metric for runners */}
+        <PaceChart />
       </motion.div>
 
-      {/* Pace Trends */}
+      {/* More Stats - Collapsible Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <PaceChart />
-      </motion.div>
+        <Collapsible open={moreStatsOpen} onOpenChange={setMoreStatsOpen}>
+          <Card className="border-border/50">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg pb-3">
+                <CardTitle className="text-base font-medium flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-primary" />
+                    <span>More Stats</span>
+                  </div>
+                  <ChevronDown 
+                    className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+                      moreStatsOpen ? "rotate-180" : ""
+                    }`} 
+                  />
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0 space-y-4">
+                {/* Heart Rate Trends */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Heart className="w-4 h-4" />
+                    <span>Heart Rate</span>
+                  </div>
+                  <HeartRateChart compact />
+                </div>
 
-      {/* Heart Rate Trends */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <HeartRateChart />
-      </motion.div>
+                {/* Elevation Gain */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Mountain className="w-4 h-4" />
+                    <span>Elevation</span>
+                  </div>
+                  <ElevationChart compact />
+                </div>
 
-      {/* Elevation Gain */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <ElevationChart />
-      </motion.div>
-
-      {/* Calories Burned */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-      >
-        <CaloriesChart />
+                {/* Calories Burned */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Flame className="w-4 h-4" />
+                    <span>Calories</span>
+                  </div>
+                  <CaloriesChart compact />
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </motion.div>
 
       {/* Recent Activities */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.15 }}
       >
         <ActivityList />
       </motion.div>
