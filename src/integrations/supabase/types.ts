@@ -247,6 +247,7 @@ export type Database = {
           follower_count: number | null
           friend_count: number | null
           id: string
+          last_synced_at: string | null
           longest_streak: number | null
           measurement_preference: string | null
           monthly_distance_goal: number | null
@@ -272,6 +273,7 @@ export type Database = {
           follower_count?: number | null
           friend_count?: number | null
           id?: string
+          last_synced_at?: string | null
           longest_streak?: number | null
           measurement_preference?: string | null
           monthly_distance_goal?: number | null
@@ -297,6 +299,7 @@ export type Database = {
           follower_count?: number | null
           friend_count?: number | null
           id?: string
+          last_synced_at?: string | null
           longest_streak?: number | null
           measurement_preference?: string | null
           monthly_distance_goal?: number | null
