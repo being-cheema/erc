@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Activity, CheckCircle2, Loader2, TrendingUp, Trophy, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, TrendingUp, Trophy, XCircle, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 type SyncStep = "auth" | "syncing" | "calculating" | "achievements" | "complete" | "error";
 
@@ -12,6 +13,7 @@ interface SyncState {
   message: string;
   activitiesFound?: number;
   progress?: number;
+  errorDetails?: string;
 }
 
 const StravaCallback = () => {
@@ -21,93 +23,98 @@ const StravaCallback = () => {
     step: "auth",
     message: "Connecting to Strava...",
   });
+  const [canRetry, setCanRetry] = useState(false);
   const syncTriggered = useRef(false);
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      if (syncTriggered.current) return;
-      syncTriggered.current = true;
+  const handleCallback = async () => {
+    const code = searchParams.get("code");
+    const error = searchParams.get("error");
 
-      const code = searchParams.get("code");
-      const error = searchParams.get("error");
+    if (error) {
+      setSyncState({
+        step: "error",
+        message: "Authorization was denied",
+        errorDetails: "Please try logging in again.",
+      });
+      setCanRetry(true);
+      return;
+    }
 
-      if (error) {
-        setSyncState({
-          step: "error",
-          message: "Authorization was denied. Please try again.",
-        });
-        setTimeout(() => navigate("/login"), 3000);
-        return;
+    if (!code) {
+      setSyncState({
+        step: "error",
+        message: "No authorization code received",
+        errorDetails: "Please try logging in again.",
+      });
+      setCanRetry(true);
+      return;
+    }
+
+    try {
+      setSyncState({ step: "auth", message: "Exchanging tokens...", progress: 10 });
+
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=callback&code=${code}`;
+      const callbackResponse = await fetch(functionUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!callbackResponse.ok) {
+        const errorData = await callbackResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error: ${callbackResponse.status}`);
       }
 
-      if (!code) {
-        setSyncState({
-          step: "error",
-          message: "No authorization code received.",
-        });
-        setTimeout(() => navigate("/login"), 3000);
-        return;
+      const data = await callbackResponse.json();
+
+      if (data.error) {
+        throw new Error(data.error);
       }
+
+      setSyncState({ step: "auth", message: "Signing you in...", progress: 20 });
+
+      // Use the token to verify and create session
+      if (data.token) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: data.token,
+          type: "magiclink",
+        });
+
+        if (verifyError) {
+          console.error("Verify error:", verifyError);
+          // Don't fail completely - user might still be created
+        }
+      }
+
+      const athleteName = data.athlete?.firstname || "Runner";
+      const userId = data.user_id;
+
+      // Now trigger sync to check if data needs to be fetched
+      setSyncState({
+        step: "syncing",
+        message: `Welcome, ${athleteName}! Syncing your activities...`,
+        progress: 30,
+      });
 
       try {
-        setSyncState({ step: "auth", message: "Exchanging tokens...", progress: 10 });
-
-        const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=callback&code=${code}`;
-        const callbackResponse = await fetch(functionUrl, {
-          method: "GET",
+        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
+        const syncResponse = await fetch(syncUrl, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            user_id: userId,
+          }),
         });
 
-        const data = await callbackResponse.json();
+        const syncData = await syncResponse.json();
 
-        if (!callbackResponse.ok || data.error) {
-          throw new Error(data.error || "Failed to authenticate");
-        }
-
-        setSyncState({ step: "auth", message: "Signing you in...", progress: 20 });
-
-        // Use the token to verify and create session
-        if (data.token) {
-          const { error: verifyError } = await supabase.auth.verifyOtp({
-            token_hash: data.token,
-            type: "magiclink",
-          });
-
-          if (verifyError) {
-            console.error("Verify error:", verifyError);
-          }
-        }
-
-        const athleteName = data.athlete?.firstname || "Runner";
-
-        // Check if this is a new user - need to do full historical sync
-        if (data.is_new_user) {
-          setSyncState({
-            step: "syncing",
-            message: `Welcome, ${athleteName}! Fetching your running history...`,
-            progress: 30,
-          });
-
-          // Trigger full historical sync
-          const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
-          const syncResponse = await fetch(syncUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              initial_sync: true,
-              user_id: data.user_id,
-            }),
-          });
-
-          const syncData = await syncResponse.json();
-
-          if (syncData.success && syncData.results?.[0]) {
-            const result = syncData.results[0];
-            
+        if (syncData.success && syncData.results?.[0]) {
+          const result = syncData.results[0];
+          
+          if (result.success) {
             setSyncState({
               step: "calculating",
               message: `Found ${result.activities || 0} runs! Calculating your stats...`,
@@ -126,39 +133,62 @@ const StravaCallback = () => {
               });
               await new Promise(resolve => setTimeout(resolve, 1500));
             }
+
+            setSyncState({
+              step: "complete",
+              message: `You're all set, ${athleteName}!`,
+              activitiesFound: result.activities,
+              progress: 100,
+            });
+          } else {
+            // Sync had an error but auth succeeded - still proceed
+            console.warn("Sync warning:", result.error);
+            setSyncState({
+              step: "complete",
+              message: `Welcome, ${athleteName}!`,
+              progress: 100,
+            });
           }
-
-          setSyncState({
-            step: "complete",
-            message: `You're all set, ${athleteName}!`,
-            progress: 100,
-          });
-
-          await new Promise(resolve => setTimeout(resolve, 1200));
-          navigate("/home");
         } else {
-          // Existing user - just welcome them back
+          // No sync data but auth succeeded
           setSyncState({
             step: "complete",
-            message: `Welcome back, ${athleteName}!`,
+            message: `Welcome, ${athleteName}!`,
             progress: 100,
           });
-
-          await new Promise(resolve => setTimeout(resolve, 1200));
-          navigate("/home");
         }
-      } catch (err) {
-        console.error("Callback error:", err);
+      } catch (syncError) {
+        // Sync failed but auth succeeded - still proceed
+        console.error("Sync error:", syncError);
         setSyncState({
-          step: "error",
-          message: "Failed to connect. Please try again.",
+          step: "complete",
+          message: `Welcome, ${athleteName}!`,
+          progress: 100,
         });
-        setTimeout(() => navigate("/login"), 3000);
       }
-    };
 
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      navigate("/home");
+    } catch (err) {
+      console.error("Callback error:", err);
+      setSyncState({
+        step: "error",
+        message: "Connection failed",
+        errorDetails: err instanceof Error ? err.message : "Please try again.",
+      });
+      setCanRetry(true);
+    }
+  };
+
+  useEffect(() => {
+    if (syncTriggered.current) return;
+    syncTriggered.current = true;
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams]);
+
+  const handleRetry = () => {
+    navigate("/login");
+  };
 
   const getIcon = () => {
     switch (syncState.step) {
@@ -177,7 +207,7 @@ const StravaCallback = () => {
             animate={{ scale: 1 }}
             className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center"
           >
-            <Activity className="w-8 h-8 text-white" />
+            <Activity className="w-8 h-8 text-primary-foreground" />
           </motion.div>
         );
       case "calculating":
@@ -187,7 +217,7 @@ const StravaCallback = () => {
             animate={{ scale: 1 }}
             className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center"
           >
-            <TrendingUp className="w-8 h-8 text-white" />
+            <TrendingUp className="w-8 h-8 text-primary-foreground" />
           </motion.div>
         );
       case "achievements":
@@ -209,7 +239,7 @@ const StravaCallback = () => {
             transition={{ type: "spring", stiffness: 200 }}
             className="w-16 h-16 rounded-full bg-success flex items-center justify-center"
           >
-            <CheckCircle2 className="w-8 h-8 text-white" />
+            <CheckCircle2 className="w-8 h-8 text-success-foreground" />
           </motion.div>
         );
       case "error":
@@ -219,7 +249,7 @@ const StravaCallback = () => {
             animate={{ scale: 1 }}
             className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center"
           >
-            <XCircle className="w-8 h-8 text-white" />
+            <XCircle className="w-8 h-8 text-destructive-foreground" />
           </motion.div>
         );
     }
@@ -253,7 +283,17 @@ const StravaCallback = () => {
           {syncState.message}
         </motion.p>
 
-        {syncState.activitiesFound !== undefined && (
+        {syncState.errorDetails && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm text-muted-foreground"
+          >
+            {syncState.errorDetails}
+          </motion.p>
+        )}
+
+        {syncState.activitiesFound !== undefined && syncState.activitiesFound > 0 && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -282,6 +322,19 @@ const StravaCallback = () => {
           >
             This may take a moment for users with lots of activities...
           </motion.p>
+        )}
+
+        {canRetry && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Button onClick={handleRetry} variant="outline" className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </Button>
+          </motion.div>
         )}
       </motion.div>
     </div>
