@@ -12,12 +12,14 @@ import logo from "@/assets/logo.png";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefresh from "@/components/PullToRefresh";
 import { useQueryClient } from "@tanstack/react-query";
+import { useHaptics } from "@/hooks/useHaptics";
 
 const Home = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const { data: races } = useRaces();
+  const { lightImpact, mediumImpact } = useHaptics();
 
   const {
     isRefreshing,
@@ -43,8 +45,14 @@ const Home = () => {
   };
 
   const handleLogout = async () => {
+    mediumImpact();
     await supabase.auth.signOut();
     navigate("/login");
+  };
+
+  const handleCardTap = (path: string) => {
+    lightImpact();
+    navigate(path);
   };
 
   const monthlyDistance = profile?.total_distance || 0;
@@ -139,7 +147,7 @@ const Home = () => {
         >
           <Card 
             className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
-            onClick={() => navigate("/leaderboard")}
+            onClick={() => handleCardTap("/leaderboard")}
           >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -156,7 +164,7 @@ const Home = () => {
 
           <Card 
             className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
-            onClick={() => navigate("/stats")}
+            onClick={() => handleCardTap("/stats")}
           >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -182,7 +190,7 @@ const Home = () => {
         >
           <Card 
             className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
-            onClick={() => navigate("/races")}
+            onClick={() => handleCardTap("/races")}
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">

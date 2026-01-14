@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Home, Calendar, BarChart3, Trophy, Settings } from "lucide-react";
 import { motion } from "framer-motion";
+import { useHaptics } from "@/hooks/useHaptics";
 
 const navItems = [
   { path: "/home", icon: Home, label: "Home" },
@@ -12,6 +13,11 @@ const navItems = [
 
 const BottomNav = () => {
   const location = useLocation();
+  const { lightImpact } = useHaptics();
+
+  const handleNavTap = () => {
+    lightImpact();
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 glass border-t border-border/50 safe-area-inset-bottom z-50">
@@ -24,6 +30,7 @@ const BottomNav = () => {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={handleNavTap}
               className="relative flex flex-col items-center justify-center w-16 h-full"
             >
               <div className="relative flex flex-col items-center">

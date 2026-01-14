@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface NotificationPreferences {
   achievements: boolean;
@@ -28,6 +29,7 @@ const Settings = () => {
   const { data: user } = useCurrentUser();
   const { theme, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
+  const { lightImpact, mediumImpact, selectionChanged, notificationSuccess } = useHaptics();
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -122,15 +124,28 @@ const Settings = () => {
   });
 
   const handleSaveProfile = async () => {
+    mediumImpact();
     setIsSaving(true);
     await updateProfileMutation.mutateAsync();
+    notificationSuccess();
     setIsSaving(false);
   };
 
   const handleNotificationToggle = (key: keyof NotificationPreferences) => {
+    selectionChanged();
     const newPrefs = { ...notificationPrefs, [key]: !notificationPrefs[key] };
     setNotificationPrefs(newPrefs);
     updateNotificationsMutation.mutate(newPrefs);
+  };
+
+  const handleThemeToggle = () => {
+    selectionChanged();
+    toggleTheme();
+  };
+
+  const handleBackTap = () => {
+    lightImpact();
+    navigate(-1);
   };
 
   if (profileLoading) {
@@ -153,7 +168,7 @@ const Settings = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(-1)}
+            onClick={handleBackTap}
             className="rounded-full"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -260,7 +275,7 @@ const Settings = () => {
                 </div>
                 <Switch
                   checked={theme === "dark"}
-                  onCheckedChange={toggleTheme}
+                  onCheckedChange={handleThemeToggle}
                 />
               </div>
             </CardContent>
