@@ -7,7 +7,7 @@ const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((pro
   <svg
     ref={ref}
     viewBox="0 0 24 24"
-    className="w-6 h-6"
+    className="w-5 h-5"
     fill="currentColor"
     {...props}
   >
@@ -41,54 +41,76 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
-      {/* Background gradient orbs */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-      
-      {/* Content */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 safe-area-inset-top safe-area-inset-bottom relative z-10">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Hero Section */}
+      <div className="flex-1 flex flex-col justify-center px-6 safe-area-inset-top">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-sm space-y-8"
+          className="w-full max-w-sm mx-auto space-y-12"
         >
-          {/* Logo & Title */}
-          <div className="text-center space-y-6">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="flex justify-center"
-            >
-              <img 
-                src={logo} 
-                alt="Erode Runners Club" 
-                className="h-32 w-auto object-contain drop-shadow-lg"
-              />
-            </motion.div>
-            
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-            >
-              <p className="text-muted-foreground mt-2 text-lg">Run to Live. Live to Run.</p>
-            </motion.div>
-          </div>
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="flex justify-center"
+          >
+            <img 
+              src={logo} 
+              alt="Erode Runners Club" 
+              className="h-24 w-auto object-contain"
+            />
+          </motion.div>
+          
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="text-center space-y-4"
+          >
+            <h1 className="text-4xl font-black uppercase tracking-tight text-foreground">
+              Run to Live.
+            </h1>
+            <p className="text-lg text-muted-foreground font-medium">
+              Track your runs. Compete with the community.
+            </p>
+          </motion.div>
 
-          {/* Strava Login Button */}
+          {/* Stats preview */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="grid grid-cols-3 gap-4"
+          >
+            <div className="text-center">
+              <p className="text-3xl font-black text-foreground">650+</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">Runners</p>
+            </div>
+            <div className="text-center border-l border-r border-border">
+              <p className="text-3xl font-black text-primary">12K</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">Runs</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-black text-foreground">50K</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">KM</p>
+            </div>
+          </motion.div>
+
+          {/* Login Button */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
             className="space-y-4"
           >
             <Button
               onClick={handleStravaLogin}
               disabled={isLoading}
-              className="w-full h-14 text-base font-semibold bg-strava hover:bg-strava-dark text-white disabled:opacity-50 transition-all"
+              className="w-full h-14 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-sm disabled:opacity-50 transition-all"
             >
               {isLoading ? (
                 <motion.div
@@ -99,31 +121,29 @@ const Login = () => {
               ) : (
                 <>
                   <StravaIcon />
-                  <span className="ml-3">Continue with Strava</span>
+                  <span className="ml-2">Connect with Strava</span>
                 </>
               )}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground leading-relaxed">
-              By continuing, you agree to sync your running data from Strava.
-              We only access your activity data to show your stats and rankings.
+              We sync your runs from Strava to show stats and rankings.
             </p>
           </motion.div>
         </motion.div>
       </div>
 
-      {/* Footer - Strava branding compliance */}
+      {/* Footer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.5 }}
-        className="py-6 text-center relative z-10"
+        className="py-6 border-t border-border safe-area-inset-bottom"
       >
         <div className="flex items-center justify-center gap-2 text-muted-foreground">
-          <span className="text-xs">Powered by</span>
+          <span className="text-xs font-medium uppercase tracking-widest">Powered by</span>
           <div className="flex items-center gap-1 text-strava">
             <StravaIcon />
-            <span className="text-xs font-semibold">Strava</span>
           </div>
         </div>
       </motion.div>
