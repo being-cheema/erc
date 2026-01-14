@@ -1,72 +1,59 @@
 import { motion } from "framer-motion";
-import { LucideIcon } from "lucide-react";
+import RunnerIllustration from "./RunnerIllustration";
 
 interface OnboardingSlideProps {
-  icon: LucideIcon;
+  variant: "solo" | "community" | "trophy";
   title: string;
   description: string;
   isActive: boolean;
 }
 
-const OnboardingSlide = ({ icon: Icon, title, description, isActive }: OnboardingSlideProps) => {
+const OnboardingSlide = ({ variant, title, description, isActive }: OnboardingSlideProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ 
-        opacity: isActive ? 1 : 0.5, 
-        scale: isActive ? 1 : 0.9 
-      }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className="flex flex-col items-center justify-center text-center px-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isActive ? 1 : 0 }}
+      transition={{ duration: 0.4 }}
+      className="flex flex-col items-center justify-center text-center px-8 py-4"
     >
+      {/* Illustration Container */}
       <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.5 }}
-        className="relative mb-8"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
+        className="relative mb-10 h-44 flex items-center justify-center"
       >
-        <div className="w-32 h-32 rounded-full gradient-primary flex items-center justify-center glow-primary">
-          <motion.div
-            animate={{ 
-              y: [0, -5, 0],
-            }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
-            }}
-          >
-            <Icon className="w-16 h-16 text-white" strokeWidth={1.5} />
-          </motion.div>
-        </div>
+        {/* Background glow */}
         <motion.div
-          className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-3 bg-primary/20 rounded-full blur-md"
-          animate={{ 
-            scaleX: [1, 1.2, 1],
-            opacity: [0.4, 0.7, 0.4]
+          className="absolute inset-0 flex items-center justify-center"
+          animate={{
+            opacity: [0.4, 0.6, 0.4],
           }}
-          transition={{ 
-            duration: 2, 
-            repeat: Infinity, 
-            ease: "easeInOut" 
-          }}
-        />
+          transition={{ duration: 3, repeat: Infinity }}
+        >
+          <div className="w-48 h-48 rounded-full bg-gradient-to-br from-primary/20 via-accent/10 to-transparent blur-3xl" />
+        </motion.div>
+
+        {/* Illustration */}
+        <RunnerIllustration variant={variant} className="relative z-10" />
       </motion.div>
 
+      {/* Title */}
       <motion.h2
-        initial={{ y: 20, opacity: 0 }}
+        initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
-        className="text-2xl font-bold text-foreground mb-4"
+        transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
+        className="text-3xl font-bold text-foreground mb-4 tracking-tight"
       >
         {title}
       </motion.h2>
 
+      {/* Description */}
       <motion.p
-        initial={{ y: 20, opacity: 0 }}
+        initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-        className="text-muted-foreground text-base leading-relaxed max-w-xs"
+        transition={{ delay: 0.45, duration: 0.5, ease: "easeOut" }}
+        className="text-muted-foreground text-base leading-relaxed max-w-[280px]"
       >
         {description}
       </motion.p>
