@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { TrendingUp, Footprints, Zap, Award, Timer, Flame } from "lucide-react";
+import { TrendingUp, Footprints, Zap, Award, Timer, Flame, Heart, Mountain } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProfile } from "@/hooks/useProfile";
 import { useRecentActivities, formatPace } from "@/hooks/useActivities";
@@ -14,13 +14,20 @@ const OverviewTab = () => {
   const currentStreak = profile?.current_streak || 0;
   const longestStreak = profile?.longest_streak || 0;
 
-  // Calculate average pace from recent activities
-  const avgPace = activities && activities.length > 0
-    ? activities.reduce((sum, a) => sum + (a.average_pace || 0), 0) / activities.filter(a => a.average_pace).length
+  // Calculate averages from recent activities
+  const activitiesWithPace = activities?.filter(a => a.average_pace) || [];
+  const avgPace = activitiesWithPace.length > 0
+    ? activitiesWithPace.reduce((sum, a) => sum + (a.average_pace || 0), 0) / activitiesWithPace.length
     : null;
 
-  // Estimate calories (rough: 60 cal per km)
-  const estimatedCalories = Math.round((totalDistance / 1000) * 60);
+  const activitiesWithHR = activities?.filter(a => a.average_heartrate) || [];
+  const avgHeartRate = activitiesWithHR.length > 0
+    ? Math.round(activitiesWithHR.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / activitiesWithHR.length)
+    : null;
+
+  // Calculate total elevation and calories from activities
+  const totalElevation = activities?.reduce((sum, a) => sum + (a.elevation_gain || 0), 0) || 0;
+  const totalCalories = activities?.reduce((sum, a) => sum + (a.calories || 0), 0) || 0;
 
   const statCards = [
     {
@@ -59,11 +66,25 @@ const OverviewTab = () => {
       gradient: "bg-accent",
     },
     {
-      label: "Est. Calories",
-      value: estimatedCalories > 1000 ? `${(estimatedCalories / 1000).toFixed(1)}k` : `${estimatedCalories}`,
+      label: "Avg Heart Rate",
+      value: avgHeartRate ? `${avgHeartRate}` : "—",
+      unit: "bpm",
+      icon: Heart,
+      gradient: "bg-destructive",
+    },
+    {
+      label: "Total Elevation",
+      value: totalElevation > 1000 ? `${(totalElevation / 1000).toFixed(1)}k` : `${Math.round(totalElevation)}`,
+      unit: "m",
+      icon: Mountain,
+      gradient: "bg-success",
+    },
+    {
+      label: "Calories Burned",
+      value: totalCalories > 1000 ? `${(totalCalories / 1000).toFixed(1)}k` : `${totalCalories}`,
       unit: "kcal",
       icon: Flame,
-      gradient: "bg-destructive",
+      gradient: "bg-warning",
     },
   ];
 
