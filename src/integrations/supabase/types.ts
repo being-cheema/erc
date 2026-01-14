@@ -47,6 +47,51 @@ export type Database = {
         }
         Relationships: []
       }
+      activities: {
+        Row: {
+          activity_type: string | null
+          average_pace: number | null
+          calories: number | null
+          created_at: string | null
+          distance: number | null
+          elevation_gain: number | null
+          id: string
+          moving_time: number | null
+          name: string | null
+          start_date: string | null
+          strava_id: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          average_pace?: number | null
+          calories?: number | null
+          created_at?: string | null
+          distance?: number | null
+          elevation_gain?: number | null
+          id?: string
+          moving_time?: number | null
+          name?: string | null
+          start_date?: string | null
+          strava_id?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          average_pace?: number | null
+          calories?: number | null
+          created_at?: string | null
+          distance?: number | null
+          elevation_gain?: number | null
+          id?: string
+          moving_time?: number | null
+          name?: string | null
+          start_date?: string | null
+          strava_id?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           author_id: string | null
@@ -167,6 +212,7 @@ export type Database = {
           display_name: string | null
           id: string
           longest_streak: number | null
+          monthly_distance_goal: number | null
           strava_access_token: string | null
           strava_id: string | null
           strava_refresh_token: string | null
@@ -184,6 +230,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           longest_streak?: number | null
+          monthly_distance_goal?: number | null
           strava_access_token?: string | null
           strava_id?: string | null
           strava_refresh_token?: string | null
@@ -201,6 +248,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           longest_streak?: number | null
+          monthly_distance_goal?: number | null
           strava_access_token?: string | null
           strava_id?: string | null
           strava_refresh_token?: string | null

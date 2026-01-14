@@ -1,46 +1,11 @@
 import { motion } from "framer-motion";
-import { TrendingUp, Footprints, Zap, Award, Loader2, Activity } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Activity } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import StatsTabs from "@/components/stats/StatsTabs";
+import { Card, CardContent } from "@/components/ui/card";
 
 const Stats = () => {
   const { data: profile, isLoading } = useProfile();
-
-  const totalDistance = profile?.total_distance || 0;
-  const totalRuns = profile?.total_runs || 0;
-  const currentStreak = profile?.current_streak || 0;
-  const longestStreak = profile?.longest_streak || 0;
-
-  const statCards = [
-    { 
-      label: "Total Distance", 
-      value: `${(Number(totalDistance) / 1000).toFixed(1)}`, 
-      unit: "km", 
-      icon: TrendingUp,
-      gradient: "gradient-primary",
-    },
-    { 
-      label: "Total Runs", 
-      value: `${totalRuns}`, 
-      unit: "runs", 
-      icon: Footprints,
-      gradient: "bg-success",
-    },
-    { 
-      label: "Current Streak", 
-      value: `${currentStreak}`, 
-      unit: "days", 
-      icon: Zap,
-      gradient: "bg-warning",
-    },
-    { 
-      label: "Longest Streak", 
-      value: `${longestStreak}`, 
-      unit: "days", 
-      icon: Award,
-      gradient: "gradient-gold",
-    },
-  ];
 
   if (isLoading) {
     return (
@@ -63,30 +28,8 @@ const Stats = () => {
       </motion.header>
 
       <div className="px-4 space-y-4">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          {statCards.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card className="border-border/50 overflow-hidden">
-                <CardContent className="p-4">
-                  <div className={`w-11 h-11 rounded-xl ${stat.gradient} flex items-center justify-center mb-3`}>
-                    <stat.icon className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">{stat.label}</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-foreground font-sans">{stat.value}</span>
-                    <span className="text-muted-foreground text-sm">{stat.unit}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        {/* Stats Tabs with Charts */}
+        <StatsTabs />
 
         {/* Strava Status */}
         {profile?.strava_id ? (
@@ -96,16 +39,20 @@ const Stats = () => {
             transition={{ delay: 0.4 }}
           >
             <Card className="border-success/30 bg-success/5">
-              <CardContent className="p-6 text-center">
-                <div className="w-16 h-16 mx-auto rounded-full bg-strava/10 flex items-center justify-center mb-4">
-                  <svg viewBox="0 0 24 24" className="w-8 h-8 text-strava" fill="currentColor">
-                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                  </svg>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-6 h-6 text-strava" fill="currentColor">
+                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground font-sans">Strava Connected</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Your data syncs automatically
+                    </p>
+                  </div>
                 </div>
-                <h3 className="font-semibold text-foreground mb-2 font-sans">Strava Connected</h3>
-                <p className="text-muted-foreground text-sm">
-                  Your running data is synced from Strava automatically.
-                </p>
               </CardContent>
             </Card>
           </motion.div>
