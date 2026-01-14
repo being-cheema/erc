@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useProfile } from "@/hooks/useProfile";
 import { useMonthlyDistance } from "@/hooks/useMonthlyStats";
@@ -26,11 +25,11 @@ const GoalProgress = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
       >
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center justify-center h-24">
+        <div className="bg-card border border-border p-5">
+          <div className="flex items-center justify-center h-20">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </motion.div>
     );
   }
@@ -41,16 +40,17 @@ const GoalProgress = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.15 }}
     >
-      <Card 
-        className={`border-border/50 cursor-pointer active:scale-[0.99] transition-transform overflow-hidden ${
-          isGoalMet ? "border-success/30 bg-success/5" : ""
+      <div 
+        className={`bg-card border p-5 press-scale cursor-pointer ${
+          isGoalMet ? "border-success" : "border-border"
         }`}
         onClick={() => navigate("/settings")}
       >
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isGoalMet ? "bg-success" : "gradient-primary"
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 flex items-center justify-center ${
+              isGoalMet ? "bg-success" : "bg-primary"
             }`}>
               {isGoalMet ? (
                 <TrendingUp className="w-5 h-5 text-white" />
@@ -58,45 +58,53 @@ const GoalProgress = () => {
                 <Target className="w-5 h-5 text-white" />
               )}
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Monthly Goal
               </p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-lg font-bold text-foreground">
-                  {(currentMonthlyDistance / 1000).toFixed(1)}
-                </span>
-                <span className="text-muted-foreground text-sm">
-                  / {(monthlyGoal / 1000).toFixed(0)} km
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className={`text-lg font-bold ${
-                isGoalMet ? "text-success" : "text-primary"
-              }`}>
-                {progress.toFixed(0)}%
-              </span>
             </div>
           </div>
+          <div className="text-right">
+            <span className={`text-2xl font-black ${
+              isGoalMet ? "text-success" : "text-primary"
+            }`}>
+              {progress.toFixed(0)}%
+            </span>
+          </div>
+        </div>
 
-          <Progress 
-            value={progress} 
-            className={`h-2 ${isGoalMet ? "[&>div]:bg-success" : ""}`}
+        {/* Stats */}
+        <div className="flex items-baseline gap-1 mb-3">
+          <span className="text-4xl font-black text-foreground tracking-tight">
+            {(currentMonthlyDistance / 1000).toFixed(1)}
+          </span>
+          <span className="text-muted-foreground text-sm font-bold">
+            / {(monthlyGoal / 1000).toFixed(0)} KM
+          </span>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="h-1 bg-secondary w-full">
+          <div 
+            className={`h-full transition-all duration-500 ${isGoalMet ? "bg-success" : "bg-primary"}`}
+            style={{ width: `${progress}%` }}
           />
+        </div>
 
+        {/* Footer text */}
+        <div className="mt-3">
           {!isGoalMet && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {(remaining / 1000).toFixed(1)} km to reach your goal
+            <p className="text-xs text-muted-foreground font-medium">
+              {(remaining / 1000).toFixed(1)} km remaining
             </p>
           )}
           {isGoalMet && (
-            <p className="text-xs text-success font-medium mt-2">
-              🎉 Goal achieved! Great work!
+            <p className="text-xs text-success font-bold uppercase tracking-widest">
+              Goal Achieved
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 };

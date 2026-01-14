@@ -1,9 +1,8 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Dumbbell } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronRight, Calendar, Trophy, Zap, LogOut, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useProfile, useCurrentUser } from "@/hooks/useProfile";
+import { useProfile } from "@/hooks/useProfile";
 import { useRaces } from "@/hooks/useRaces";
 import { useUserRank } from "@/hooks/useUserRank";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,9 +43,9 @@ const Home = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
   };
 
   const handleLogout = async () => {
@@ -84,22 +83,24 @@ const Home = () => {
         style={{ transform: `translateY(${pullDistance * 0.3}px)` }}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="Erode Runners" className="h-11 w-auto rounded-xl" />
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Erode Runners" className="h-10 w-auto" />
             <div>
-              <p className="text-muted-foreground text-sm font-medium">{getGreeting()}</p>
-              <h1 className="text-xl font-bold text-foreground">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {getGreeting()}
+              </p>
+              <h1 className="text-xl font-black text-foreground uppercase tracking-tight">
                 {profile?.display_name || "Runner"}
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Avatar 
-              className="w-10 h-10 border-2 border-primary/30 cursor-pointer"
+              className="w-10 h-10 cursor-pointer border-2 border-border"
               onClick={() => navigate("/settings")}
             >
               <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              <AvatarFallback className="bg-secondary text-foreground font-bold">
                 {profile?.display_name?.[0]?.toUpperCase() || "R"}
               </AvatarFallback>
             </Avatar>
@@ -107,7 +108,7 @@ const Home = () => {
               variant="ghost" 
               size="icon" 
               onClick={handleLogout}
-              className="rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary"
             >
               <LogOut className="w-5 h-5" />
             </Button>
@@ -126,41 +127,41 @@ const Home = () => {
           transition={{ delay: 0.2 }}
           className="grid grid-cols-2 gap-3"
         >
-          <Card 
-            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
+          {/* Rank Card */}
+          <div 
+            className="bg-card p-4 press-scale cursor-pointer border border-border"
             onClick={() => handleCardTap("/leaderboard")}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-sm">
-                  <Trophy className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Rank</p>
-                  <p className="text-2xl font-bold text-foreground">{userRank?.rank ? `#${userRank.rank}` : "—"}</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-primary flex items-center justify-center">
+                <Trophy className="w-6 h-6 text-primary-foreground" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Rank</p>
+                <p className="text-3xl font-black text-foreground tracking-tight">
+                  {userRank?.rank ? `#${userRank.rank}` : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <Card 
-            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
+          {/* Streak Card */}
+          <div 
+            className="bg-card p-4 press-scale cursor-pointer border border-border"
             onClick={() => handleCardTap("/stats")}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-success to-emerald-600 flex items-center justify-center shadow-sm">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Streak</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {currentStreak}<span className="text-sm font-medium text-muted-foreground ml-1">days</span>
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-success flex items-center justify-center">
+                <Zap className="w-6 h-6 text-success-foreground" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Streak</p>
+                <p className="text-3xl font-black text-foreground tracking-tight">
+                  {currentStreak}<span className="text-sm font-bold text-muted-foreground ml-1">D</span>
+                </p>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
         {/* Recent Activity */}
@@ -174,18 +175,16 @@ const Home = () => {
           className="grid grid-cols-2 gap-3"
         >
           {/* Next Race Card */}
-          <Card 
-            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
+          <div 
+            className="bg-card p-4 press-scale cursor-pointer border border-border"
             onClick={() => handleCardTap("/races")}
           >
-            <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium uppercase">Next Race</p>
-                  <p className="font-semibold text-foreground text-sm truncate">
+                <Calendar className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Next Race</p>
+                  <p className="text-sm font-bold text-foreground">
                     {upcomingRace 
                       ? format(new Date(upcomingRace.race_date), "MMM d")
                       : "View All"
@@ -193,28 +192,26 @@ const Home = () => {
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
 
           {/* Training Card */}
-          <Card 
-            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
+          <div 
+            className="bg-card p-4 press-scale cursor-pointer border border-border"
             onClick={() => handleCardTap("/training")}
           >
-            <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Dumbbell className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium uppercase">Training</p>
-                  <p className="font-semibold text-foreground text-sm">
-                    View Plans
-                  </p>
+                <Dumbbell className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Training</p>
+                  <p className="text-sm font-bold text-foreground">View Plans</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
         </motion.div>
 
         {/* Strava Connected Status */}
@@ -224,24 +221,21 @@ const Home = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="border-strava/20 bg-strava/5">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-strava" fill="currentColor">
-                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-foreground text-sm">Strava Connected</h3>
-                    <p className="text-muted-foreground text-xs">
-                      Pull down to sync latest activities
-                    </p>
-                  </div>
-                  <TrendingUp className="w-4 h-4 text-strava" />
+            <div className="bg-card border border-primary/30 p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-strava flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                  </svg>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex-1">
+                  <h3 className="font-bold text-foreground text-sm uppercase tracking-wide">Strava Connected</h3>
+                  <p className="text-muted-foreground text-xs">
+                    Pull down to sync latest activities
+                  </p>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </div>
