@@ -49,46 +49,79 @@ export type Database = {
       }
       activities: {
         Row: {
+          achievement_count: number | null
           activity_type: string | null
+          average_heartrate: number | null
           average_pace: number | null
+          average_speed: number | null
           calories: number | null
           created_at: string | null
+          description: string | null
           distance: number | null
+          elapsed_time: number | null
           elevation_gain: number | null
+          gear_id: string | null
           id: string
+          kudos_count: number | null
+          max_heartrate: number | null
+          max_speed: number | null
           moving_time: number | null
           name: string | null
           start_date: string | null
           strava_id: number | null
+          suffer_score: number | null
           user_id: string
+          workout_type: number | null
         }
         Insert: {
+          achievement_count?: number | null
           activity_type?: string | null
+          average_heartrate?: number | null
           average_pace?: number | null
+          average_speed?: number | null
           calories?: number | null
           created_at?: string | null
+          description?: string | null
           distance?: number | null
+          elapsed_time?: number | null
           elevation_gain?: number | null
+          gear_id?: string | null
           id?: string
+          kudos_count?: number | null
+          max_heartrate?: number | null
+          max_speed?: number | null
           moving_time?: number | null
           name?: string | null
           start_date?: string | null
           strava_id?: number | null
+          suffer_score?: number | null
           user_id: string
+          workout_type?: number | null
         }
         Update: {
+          achievement_count?: number | null
           activity_type?: string | null
+          average_heartrate?: number | null
           average_pace?: number | null
+          average_speed?: number | null
           calories?: number | null
           created_at?: string | null
+          description?: string | null
           distance?: number | null
+          elapsed_time?: number | null
           elevation_gain?: number | null
+          gear_id?: string | null
           id?: string
+          kudos_count?: number | null
+          max_heartrate?: number | null
+          max_speed?: number | null
           moving_time?: number | null
           name?: string | null
           start_date?: string | null
           strava_id?: number | null
+          suffer_score?: number | null
           user_id?: string
+          workout_type?: number | null
         }
         Relationships: []
       }
@@ -207,12 +240,18 @@ export type Database = {
         Row: {
           avatar_url: string | null
           city: string | null
+          country: string | null
           created_at: string
           current_streak: number | null
           display_name: string | null
+          follower_count: number | null
+          friend_count: number | null
           id: string
           longest_streak: number | null
+          measurement_preference: string | null
           monthly_distance_goal: number | null
+          premium: boolean | null
+          sex: string | null
           strava_access_token: string | null
           strava_id: string | null
           strava_refresh_token: string | null
@@ -221,16 +260,23 @@ export type Database = {
           total_runs: number | null
           updated_at: string
           user_id: string
+          weight: number | null
         }
         Insert: {
           avatar_url?: string | null
           city?: string | null
+          country?: string | null
           created_at?: string
           current_streak?: number | null
           display_name?: string | null
+          follower_count?: number | null
+          friend_count?: number | null
           id?: string
           longest_streak?: number | null
+          measurement_preference?: string | null
           monthly_distance_goal?: number | null
+          premium?: boolean | null
+          sex?: string | null
           strava_access_token?: string | null
           strava_id?: string | null
           strava_refresh_token?: string | null
@@ -239,16 +285,23 @@ export type Database = {
           total_runs?: number | null
           updated_at?: string
           user_id: string
+          weight?: number | null
         }
         Update: {
           avatar_url?: string | null
           city?: string | null
+          country?: string | null
           created_at?: string
           current_streak?: number | null
           display_name?: string | null
+          follower_count?: number | null
+          friend_count?: number | null
           id?: string
           longest_streak?: number | null
+          measurement_preference?: string | null
           monthly_distance_goal?: number | null
+          premium?: boolean | null
+          sex?: string | null
           strava_access_token?: string | null
           strava_id?: string | null
           strava_refresh_token?: string | null
@@ -257,6 +310,7 @@ export type Database = {
           total_runs?: number | null
           updated_at?: string
           user_id?: string
+          weight?: number | null
         }
         Relationships: []
       }

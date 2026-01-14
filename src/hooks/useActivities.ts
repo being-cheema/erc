@@ -9,11 +9,22 @@ export interface Activity {
   name: string | null;
   distance: number;
   moving_time: number;
+  elapsed_time: number | null;
   start_date: string;
   average_pace: number | null;
+  average_speed: number | null;
+  max_speed: number | null;
   activity_type: string;
   calories: number;
   elevation_gain: number;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  suffer_score: number | null;
+  kudos_count: number;
+  achievement_count: number;
+  description: string | null;
+  workout_type: number | null;
+  gear_id: string | null;
   created_at: string;
 }
 

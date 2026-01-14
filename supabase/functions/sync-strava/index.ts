@@ -13,6 +13,34 @@ interface StravaActivity {
   elapsed_time: number;
   type: string;
   start_date: string;
+  total_elevation_gain?: number;
+  average_speed?: number;
+  max_speed?: number;
+  average_heartrate?: number;
+  max_heartrate?: number;
+  calories?: number;
+  suffer_score?: number;
+  kudos_count?: number;
+  achievement_count?: number;
+  description?: string;
+  workout_type?: number;
+  gear_id?: string;
+}
+
+interface StravaAthlete {
+  id: number;
+  firstname: string;
+  lastname: string;
+  profile: string;
+  profile_medium: string;
+  city: string;
+  country: string;
+  sex: string;
+  weight: number;
+  measurement_preference: string;
+  follower_count: number;
+  friend_count: number;
+  premium: boolean;
 }
 
 async function refreshToken(
@@ -89,6 +117,49 @@ async function fetchStravaActivitiesPage(
   return response.json();
 }
 
+// Fetch athlete profile data
+async function fetchStravaAthlete(accessToken: string): Promise<StravaAthlete | null> {
+  try {
+    const response = await fetch("https://www.strava.com/api/v3/athlete", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch athlete: ${response.status}`);
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching athlete:", error);
+    return null;
+  }
+}
+
+// Fetch detailed activity data (includes heart rate, etc.)
+async function fetchActivityDetails(
+  accessToken: string,
+  activityId: number
+): Promise<StravaActivity | null> {
+  try {
+    const response = await fetch(
+      `https://www.strava.com/api/v3/activities/${activityId}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!response.ok) {
+      // Don't error on individual activity failures
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 // Fetch ALL activities with pagination for full historical sync
 async function fetchAllStravaActivities(
   accessToken: string
@@ -122,6 +193,39 @@ async function fetchAllStravaActivities(
   }
 
   return allActivities;
+}
+
+// Fetch detailed data for recent activities (with rate limiting)
+async function fetchRecentActivityDetails(
+  accessToken: string,
+  activities: StravaActivity[],
+  limit: number = 30
+): Promise<Map<number, StravaActivity>> {
+  const detailsMap = new Map<number, StravaActivity>();
+  const recentActivities = activities.slice(0, limit);
+
+  console.log(`Fetching detailed data for ${recentActivities.length} recent activities...`);
+
+  // Batch in groups of 10 with small delays to avoid rate limits
+  for (let i = 0; i < recentActivities.length; i += 10) {
+    const batch = recentActivities.slice(i, i + 10);
+    const promises = batch.map((a) => fetchActivityDetails(accessToken, a.id));
+    const results = await Promise.all(promises);
+
+    results.forEach((detail, idx) => {
+      if (detail) {
+        detailsMap.set(batch[idx].id, detail);
+      }
+    });
+
+    // Small delay between batches to respect rate limits
+    if (i + 10 < recentActivities.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  console.log(`Got detailed data for ${detailsMap.size} activities`);
+  return detailsMap;
 }
 
 // Calculate streaks from run dates
@@ -400,19 +504,43 @@ Deno.serve(async (req) => {
           allRuns = allActivities.filter((a) => a.type === "Run");
         }
 
+        // Fetch athlete profile data
+        let athlete: StravaAthlete | null = null;
+        try {
+          athlete = await fetchStravaAthlete(accessToken);
+          console.log(`Fetched athlete profile for user ${profile.user_id}`);
+        } catch (athleteError) {
+          console.error("Error fetching athlete:", athleteError);
+        }
+
+        // Fetch detailed data for recent activities (heart rate, elevation, etc.)
+        const activityDetails = await fetchRecentActivityDetails(accessToken, allRuns, 50);
+
         // Calculate totals
         const monthlyDistance = monthlyRuns.reduce((sum, a) => sum + a.distance, 0);
         const monthlyRunsCount = monthlyRuns.length;
         const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
         const totalRunsCount = allRuns.length;
 
-        // Store individual activities in activities table
+        // Calculate total elevation from detailed activities
+        let totalElevation = 0;
+        activityDetails.forEach((detail) => {
+          totalElevation += detail.total_elevation_gain || 0;
+        });
+
+        // Store individual activities in activities table with detailed data
         try {
           for (const run of allRuns) {
+            const detail = activityDetails.get(run.id);
+            
             // Calculate average pace (seconds per km)
             const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
             
-            // Upsert activity (insert or update if exists)
+            // Use athlete weight for calorie calculation if available, else estimate
+            const weight = athlete?.weight || 70; // Default 70kg if not available
+            const estimatedCalories = detail?.calories || Math.round((run.distance / 1000) * weight * 0.9);
+            
+            // Upsert activity with all available data
             await supabaseAdmin
               .from("activities")
               .upsert({
@@ -421,16 +549,27 @@ Deno.serve(async (req) => {
                 name: run.name,
                 distance: run.distance,
                 moving_time: run.moving_time,
+                elapsed_time: run.elapsed_time || detail?.elapsed_time,
                 start_date: run.start_date,
                 average_pace: avgPace,
+                average_speed: detail?.average_speed || run.average_speed,
+                max_speed: detail?.max_speed || run.max_speed,
                 activity_type: run.type,
-                calories: Math.round((run.distance / 1000) * 60), // Estimate ~60 cal/km
-                elevation_gain: 0, // Would need to fetch from detailed activity
+                calories: estimatedCalories,
+                elevation_gain: detail?.total_elevation_gain || run.total_elevation_gain || 0,
+                average_heartrate: detail?.average_heartrate || run.average_heartrate,
+                max_heartrate: detail?.max_heartrate || run.max_heartrate,
+                suffer_score: detail?.suffer_score || run.suffer_score,
+                kudos_count: detail?.kudos_count || run.kudos_count || 0,
+                achievement_count: detail?.achievement_count || run.achievement_count || 0,
+                description: detail?.description,
+                workout_type: detail?.workout_type,
+                gear_id: detail?.gear_id,
               }, {
                 onConflict: 'strava_id',
               });
           }
-          console.log(`Stored ${allRuns.length} activities for user ${profile.user_id}`);
+          console.log(`Stored ${allRuns.length} activities with detailed data for user ${profile.user_id}`);
         } catch (activityError) {
           console.error("Error storing activities:", activityError);
           // Don't fail the sync if activity storage fails
@@ -440,16 +579,32 @@ Deno.serve(async (req) => {
         const runDates = allRuns.map((r) => new Date(r.start_date));
         const { currentStreak, longestStreak } = calculateStreaks(runDates);
 
-        // Update profile
+        // Update profile with athlete data
+        const profileUpdate: any = {
+          total_distance: totalDistance,
+          total_runs: totalRunsCount,
+          current_streak: currentStreak,
+          longest_streak: longestStreak,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Add athlete data if available
+        if (athlete) {
+          profileUpdate.display_name = profileUpdate.display_name || `${athlete.firstname} ${athlete.lastname}`.trim();
+          profileUpdate.avatar_url = profileUpdate.avatar_url || athlete.profile || athlete.profile_medium;
+          profileUpdate.city = athlete.city;
+          profileUpdate.country = athlete.country;
+          profileUpdate.weight = athlete.weight;
+          profileUpdate.sex = athlete.sex;
+          profileUpdate.measurement_preference = athlete.measurement_preference;
+          profileUpdate.follower_count = athlete.follower_count;
+          profileUpdate.friend_count = athlete.friend_count;
+          profileUpdate.premium = athlete.premium;
+        }
+
         const { error: updateError } = await supabaseAdmin
           .from("profiles")
-          .update({
-            total_distance: totalDistance,
-            total_runs: totalRunsCount,
-            current_streak: currentStreak,
-            longest_streak: longestStreak,
-            updated_at: new Date().toISOString(),
-          })
+          .update(profileUpdate)
           .eq("user_id", profile.user_id);
 
         if (updateError) {
