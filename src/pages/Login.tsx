@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const StravaIcon = () => (
@@ -12,9 +13,27 @@ const StravaIcon = () => (
 );
 
 const Login = () => {
-  const handleStravaLogin = () => {
-    // TODO: Implement Strava OAuth flow
-    console.log("Strava login clicked");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleStravaLogin = async () => {
+    setIsLoading(true);
+    try {
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      
+      const response = await fetch(functionUrl);
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("No auth URL received");
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to initiate Strava login:", error);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -59,10 +78,21 @@ const Login = () => {
           >
             <Button
               onClick={handleStravaLogin}
-              className="w-full h-14 text-base font-semibold bg-[#FC4C02] hover:bg-[#e64500] text-white"
+              disabled={isLoading}
+              className="w-full h-14 text-base font-semibold bg-[#FC4C02] hover:bg-[#e64500] text-white disabled:opacity-50"
             >
-              <StravaIcon />
-              <span className="ml-3">Continue with Strava</span>
+              {isLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 rounded-full border-2 border-white border-t-transparent"
+                />
+              ) : (
+                <>
+                  <StravaIcon />
+                  <span className="ml-3">Continue with Strava</span>
+                </>
+              )}
             </Button>
           </motion.div>
 

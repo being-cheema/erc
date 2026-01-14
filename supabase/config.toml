@@ -1,1 +1,4 @@
 project_id = "xjdaxxhxtozblcwluqsd"
+
+[functions.strava-auth]
+verify_jwt = false
