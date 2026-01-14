@@ -2,3 +2,6 @@ project_id = "xjdaxxhxtozblcwluqsd"
 
 [functions.strava-auth]
 verify_jwt = false
+
+[functions.sync-strava]
+verify_jwt = false

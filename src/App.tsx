@@ -13,6 +13,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import Training from "./pages/Training";
+import Admin from "./pages/Admin";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/training" element={<Training />} />
+              <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
