@@ -1,12 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import OnboardingCarousel from "@/components/onboarding/OnboardingCarousel";
+import { markOnboardingComplete } from "@/components/AuthRouter";
 
 const Onboarding = () => {
   const navigate = useNavigate();
 
   const handleComplete = () => {
-    // Mark onboarding as complete in localStorage
-    localStorage.setItem("onboarding_complete", "true");
+    // Mark onboarding as complete
+    markOnboardingComplete();
     navigate("/login");
   };
 

@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingSlide from "./OnboardingSlide";
+import ParticleField from "./ParticleField";
 import logo from "@/assets/logo.png";
 
 const slides = [
@@ -25,10 +26,13 @@ const slides = [
 
 // Background gradients for each slide
 const slideBackgrounds = [
-  "from-[hsl(210,30%,12%)] via-[hsl(200,35%,15%)] to-[hsl(190,40%,10%)]",
-  "from-[hsl(220,35%,12%)] via-[hsl(210,30%,15%)] to-[hsl(195,35%,12%)]",
-  "from-[hsl(25,40%,12%)] via-[hsl(220,25%,12%)] to-[hsl(210,30%,10%)]",
+  "from-[hsl(210,30%,8%)] via-[hsl(200,35%,12%)] to-[hsl(190,40%,8%)]",
+  "from-[hsl(220,35%,8%)] via-[hsl(210,30%,12%)] to-[hsl(195,35%,10%)]",
+  "from-[hsl(25,40%,8%)] via-[hsl(220,25%,10%)] to-[hsl(210,30%,8%)]",
 ];
+
+// Particle colors per slide
+const particleColors: Array<"primary" | "accent" | "strava" | "mixed"> = ["primary", "mixed", "strava"];
 
 interface OnboardingCarouselProps {
   onComplete: () => void;
@@ -86,39 +90,70 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
     }),
   };
 
+  // Memoize particle count based on slide
+  const particleCount = useMemo(() => {
+    return currentSlide === 2 ? 50 : 30;
+  }, [currentSlide]);
+
   return (
     <motion.div 
       className={`flex flex-col h-full min-h-screen bg-gradient-to-br ${slideBackgrounds[currentSlide]} transition-all duration-700`}
       ref={constraintsRef}
     >
-      {/* Animated background orbs */}
+      {/* Particle Field */}
+      <ParticleField 
+        count={particleCount} 
+        color={particleColors[currentSlide]} 
+      />
+
+      {/* Animated background orbs with enhanced glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute -top-32 -right-32 w-64 h-64 rounded-full bg-primary/10 blur-3xl"
+          className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-primary/15 blur-[100px]"
           animate={{
-            x: [0, 30, 0],
-            y: [0, -20, 0],
-            scale: [1, 1.1, 1],
+            x: [0, 40, 0],
+            y: [0, -30, 0],
+            scale: [1, 1.2, 1],
           }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
-          className="absolute -bottom-32 -left-32 w-64 h-64 rounded-full bg-accent/10 blur-3xl"
+          className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-accent/15 blur-[100px]"
           animate={{
-            x: [0, -20, 0],
-            y: [0, 30, 0],
-            scale: [1.1, 1, 1.1],
+            x: [0, -30, 0],
+            y: [0, 40, 0],
+            scale: [1.2, 1, 1.2],
           }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
-        {isLastSlide && (
-          <motion.div
-            className="absolute top-1/3 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full bg-strava/10 blur-3xl"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          />
-        )}
+        
+        {/* Center glow that intensifies on last slide */}
+        <motion.div
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-[80px]"
+          animate={{
+            opacity: isLastSlide ? [0.3, 0.5, 0.3] : [0.1, 0.2, 0.1],
+            scale: isLastSlide ? [1, 1.3, 1] : [1, 1.1, 1],
+          }}
+          style={{
+            background: isLastSlide 
+              ? "radial-gradient(circle, hsl(var(--strava)) 0%, transparent 70%)"
+              : "radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%)",
+          }}
+          transition={{ duration: 3, repeat: Infinity }}
+        />
+
+        {/* Animated gradient mesh overlay */}
+        <motion.div
+          className="absolute inset-0 opacity-30"
+          style={{
+            background: `radial-gradient(ellipse at 20% 80%, hsl(var(--primary) / 0.3) 0%, transparent 50%),
+                         radial-gradient(ellipse at 80% 20%, hsl(var(--accent) / 0.2) 0%, transparent 50%)`,
+          }}
+          animate={{
+            opacity: [0.2, 0.35, 0.2],
+          }}
+          transition={{ duration: 6, repeat: Infinity }}
+        />
       </div>
 
       {/* Header with Logo */}
@@ -128,19 +163,30 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="relative z-10 pt-safe-top px-6 pt-10 pb-6 flex flex-col items-center"
       >
-        <motion.img 
-          src={logo} 
-          alt="Erode Runners Club" 
-          className="h-24 w-auto object-contain drop-shadow-lg"
-          animate={{ 
-            y: [0, -4, 0],
-          }}
-          transition={{ 
-            duration: 4, 
-            repeat: Infinity, 
-            ease: "easeInOut" 
-          }}
-        />
+        <motion.div className="relative">
+          {/* Logo glow ring */}
+          <motion.div
+            className="absolute -inset-4 rounded-full bg-primary/20 blur-xl"
+            animate={{
+              opacity: [0.3, 0.5, 0.3],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
+          <motion.img 
+            src={logo} 
+            alt="Erode Runners Club" 
+            className="h-24 w-auto object-contain drop-shadow-2xl relative z-10"
+            animate={{ 
+              y: [0, -4, 0],
+            }}
+            transition={{ 
+              duration: 4, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          />
+        </motion.div>
       </motion.div>
 
       {/* Slides Container with swipe */}
@@ -198,7 +244,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
 
       {/* Bottom Section */}
       <div className="relative z-10 px-6 pb-safe-bottom pb-10 space-y-8">
-        {/* Dots Indicator */}
+        {/* Dots Indicator with enhanced glow */}
         <div className="flex justify-center gap-3">
           {slides.map((_, index) => (
             <button
@@ -219,31 +265,58 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
                 transition={{ duration: 0.3, ease: "easeOut" }}
               />
               {index === currentSlide && (
-                <motion.div
-                  className="absolute inset-0 h-2 top-2 rounded-full bg-primary/30 blur-sm"
-                  layoutId="activeDotGlow"
-                />
+                <>
+                  <motion.div
+                    className="absolute inset-0 h-2 top-2 rounded-full bg-primary/40 blur-md"
+                    layoutId="activeDotGlow"
+                  />
+                  {/* Particle burst on dot change */}
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={{ scale: 0, opacity: 1 }}
+                    animate={{ scale: 2, opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-primary/50" />
+                  </motion.div>
+                </>
               )}
             </button>
           ))}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons with breathing glow */}
         <div className="space-y-3">
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            className="relative"
           >
+            {/* Button glow effect */}
+            <motion.div
+              className={`absolute -inset-1 rounded-xl blur-lg ${
+                isLastSlide ? "bg-strava/30" : "bg-primary/20"
+              }`}
+              animate={{
+                opacity: [0.4, 0.7, 0.4],
+                scale: [1, 1.02, 1],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            
             <Button
               onClick={nextSlide}
-              className={`w-full h-14 text-base font-semibold border-0 text-white transition-all duration-300 ${
+              className={`relative w-full h-14 text-base font-semibold border-0 text-white transition-all duration-300 ${
                 isLastSlide 
-                  ? "bg-gradient-to-r from-strava to-orange-500 hover:from-strava/90 hover:to-orange-500/90 shadow-lg shadow-strava/25"
-                  : "bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                  ? "bg-gradient-to-r from-strava to-orange-500 hover:from-strava/90 hover:to-orange-500/90 shadow-lg shadow-strava/30"
+                  : "bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-lg shadow-primary/20"
               }`}
             >
               {isLastSlide ? (
-                "Get Started"
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5" />
+                  Get Started
+                </span>
               ) : (
                 <>
                   Next
