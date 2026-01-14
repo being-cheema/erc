@@ -1,13 +1,16 @@
 import { motion } from "framer-motion";
-import { BookOpen, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useBlogPosts } from "@/hooks/useBlogPosts";
+import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const Blog = () => {
-  // Placeholder data - will be populated from database
-  const articles: any[] = [];
+  const { data: articles, isLoading } = useBlogPosts();
+  const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background safe-area-inset-top">
+    <div className="min-h-screen bg-background safe-area-inset-top pb-24">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -19,7 +22,11 @@ const Blog = () => {
       </motion.header>
 
       <div className="px-4 space-y-4">
-        {articles.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : !articles || articles.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -41,12 +48,15 @@ const Blog = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden">
+              <Card 
+                className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+                onClick={() => navigate(`/blog/${article.slug}`)}
+              >
                 <CardContent className="p-0">
-                  {article.image && (
+                  {article.image_url && (
                     <div className="h-32 bg-muted">
                       <img 
-                        src={article.image} 
+                        src={article.image_url} 
                         alt={article.title}
                         className="w-full h-full object-cover"
                       />
@@ -57,11 +67,15 @@ const Blog = () => {
                       {article.category}
                     </span>
                     <h3 className="font-semibold text-foreground mt-2">{article.title}</h3>
-                    <p className="text-muted-foreground text-sm mt-1 line-clamp-2">
-                      {article.excerpt}
-                    </p>
+                    {article.excerpt && (
+                      <p className="text-muted-foreground text-sm mt-1 line-clamp-2">
+                        {article.excerpt}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between mt-3">
-                      <span className="text-muted-foreground text-xs">{article.date}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {format(new Date(article.created_at), "MMM d, yyyy")}
+                      </span>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
                   </div>

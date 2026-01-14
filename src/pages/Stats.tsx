@@ -1,20 +1,20 @@
 import { motion } from "framer-motion";
-import { TrendingUp, Timer, Footprints, Flame } from "lucide-react";
+import { TrendingUp, Timer, Footprints, Flame, Zap, Award, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useProfile } from "@/hooks/useProfile";
 
 const Stats = () => {
-  // Placeholder stats - will be replaced with Strava data
-  const stats = {
-    totalDistance: 0,
-    totalRuns: 0,
-    averagePace: "0:00",
-    totalCalories: 0,
-  };
+  const { data: profile, isLoading } = useProfile();
+
+  const totalDistance = profile?.total_distance || 0;
+  const totalRuns = profile?.total_runs || 0;
+  const currentStreak = profile?.current_streak || 0;
+  const longestStreak = profile?.longest_streak || 0;
 
   const statCards = [
     { 
       label: "Total Distance", 
-      value: `${stats.totalDistance}`, 
+      value: `${(Number(totalDistance) / 1000).toFixed(1)}`, 
       unit: "km", 
       icon: TrendingUp,
       color: "text-primary",
@@ -22,32 +22,40 @@ const Stats = () => {
     },
     { 
       label: "Total Runs", 
-      value: `${stats.totalRuns}`, 
+      value: `${totalRuns}`, 
       unit: "runs", 
       icon: Footprints,
       color: "text-success",
       bgColor: "bg-success/10"
     },
     { 
-      label: "Avg Pace", 
-      value: stats.averagePace, 
-      unit: "/km", 
-      icon: Timer,
+      label: "Current Streak", 
+      value: `${currentStreak}`, 
+      unit: "days", 
+      icon: Zap,
       color: "text-warning",
       bgColor: "bg-warning/10"
     },
     { 
-      label: "Calories Burned", 
-      value: `${stats.totalCalories}`, 
-      unit: "kcal", 
-      icon: Flame,
+      label: "Longest Streak", 
+      value: `${longestStreak}`, 
+      unit: "days", 
+      icon: Award,
       color: "text-destructive",
       bgColor: "bg-destructive/10"
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background safe-area-inset-top">
+    <div className="min-h-screen bg-background safe-area-inset-top pb-24">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -84,24 +92,44 @@ const Stats = () => {
           ))}
         </div>
 
-        {/* Connect Strava Prompt */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto rounded-full bg-[#FC4C02]/10 flex items-center justify-center mb-4">
-                <span className="text-3xl">📊</span>
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">No Activity Data</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Connect your Strava account to see your running statistics here.
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Strava Status */}
+        {profile?.strava_id ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-success/30 bg-success/5">
+              <CardContent className="p-6 text-center">
+                <div className="w-16 h-16 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-4">
+                  <span className="text-3xl">✓</span>
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">Strava Connected</h3>
+                <p className="text-muted-foreground text-sm">
+                  Your running data is synced from Strava.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-6 text-center">
+                <div className="w-16 h-16 mx-auto rounded-full bg-[#FC4C02]/10 flex items-center justify-center mb-4">
+                  <span className="text-3xl">📊</span>
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">No Activity Data</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Connect your Strava account to see your running statistics here.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );
