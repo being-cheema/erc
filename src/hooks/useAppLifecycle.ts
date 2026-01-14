@@ -17,18 +17,26 @@ export const useAppLifecycle = () => {
         appStateListener = await App.addListener("appStateChange", async ({ isActive }) => {
           if (isActive) {
             // App came back to foreground - refresh session
-            console.log("App resumed, refreshing session...");
-            const { data, error } = await supabase.auth.refreshSession();
-            if (error) {
-              console.error("Failed to refresh session:", error);
-            } else if (data.session) {
-              console.log("Session refreshed successfully");
+            // Only try to refresh if we have a session
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session) {
+              console.log("App resumed, refreshing session...");
+              const { error } = await supabase.auth.refreshSession();
+              if (error) {
+                // Only log non-missing session errors
+                if (error.name !== "AuthSessionMissingError") {
+                  console.error("Failed to refresh session:", error);
+                }
+              } else {
+                console.log("Session refreshed successfully");
+              }
             }
           }
         });
       } catch (error) {
         // Capacitor not available (running in browser)
-        console.log("Capacitor App plugin not available - running in web mode");
+        // Silent fail - this is expected in web mode
       }
     };
 
