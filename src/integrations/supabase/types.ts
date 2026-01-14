@@ -14,16 +14,512 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          requirement_type: string
+          requirement_value: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          requirement_type: string
+          requirement_value: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          requirement_type?: string
+          requirement_value?: number
+        }
+        Relationships: []
+      }
+      blog_posts: {
+        Row: {
+          author_id: string | null
+          category: string
+          content: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          image_url: string | null
+          is_published: boolean | null
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          category: string
+          content: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          category?: string
+          content?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monthly_leaderboard: {
+        Row: {
+          id: string
+          month: number
+          rank: number | null
+          rank_change: number | null
+          total_distance: number | null
+          total_runs: number | null
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          id?: string
+          month: number
+          rank?: number | null
+          rank_change?: number | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          id?: string
+          month?: number
+          rank?: number | null
+          rank_change?: number | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          achievements: boolean | null
+          id: string
+          leaderboard_changes: boolean | null
+          new_blog_posts: boolean | null
+          new_races: boolean | null
+          training_reminders: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievements?: boolean | null
+          id?: string
+          leaderboard_changes?: boolean | null
+          new_blog_posts?: boolean | null
+          new_races?: boolean | null
+          training_reminders?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievements?: boolean | null
+          id?: string
+          leaderboard_changes?: boolean | null
+          new_blog_posts?: boolean | null
+          new_races?: boolean | null
+          training_reminders?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          city: string | null
+          created_at: string
+          current_streak: number | null
+          display_name: string | null
+          id: string
+          longest_streak: number | null
+          strava_access_token: string | null
+          strava_id: string | null
+          strava_refresh_token: string | null
+          strava_token_expires_at: string | null
+          total_distance: number | null
+          total_runs: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          current_streak?: number | null
+          display_name?: string | null
+          id?: string
+          longest_streak?: number | null
+          strava_access_token?: string | null
+          strava_id?: string | null
+          strava_refresh_token?: string | null
+          strava_token_expires_at?: string | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          current_streak?: number | null
+          display_name?: string | null
+          id?: string
+          longest_streak?: number | null
+          strava_access_token?: string | null
+          strava_id?: string | null
+          strava_refresh_token?: string | null
+          strava_token_expires_at?: string | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      race_participants: {
+        Row: {
+          id: string
+          race_id: string
+          registered_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          race_id: string
+          registered_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          race_id?: string
+          registered_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "race_participants_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      races: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          distance_type: string
+          id: string
+          image_url: string | null
+          is_published: boolean | null
+          location: string | null
+          name: string
+          race_date: string
+          registration_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          distance_type: string
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          location?: string | null
+          name: string
+          race_date: string
+          registration_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          distance_type?: string
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          location?: string | null
+          name?: string
+          race_date?: string
+          registration_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      training_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_weeks: number
+          goal_distance: string
+          id: string
+          is_published: boolean | null
+          level: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_weeks: number
+          goal_distance: string
+          id?: string
+          is_published?: boolean | null
+          level: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_weeks?: number
+          goal_distance?: string
+          id?: string
+          is_published?: boolean | null
+          level?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      training_weeks: {
+        Row: {
+          focus: string | null
+          id: string
+          plan_id: string
+          week_number: number
+        }
+        Insert: {
+          focus?: string | null
+          id?: string
+          plan_id: string
+          week_number: number
+        }
+        Update: {
+          focus?: string | null
+          id?: string
+          plan_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_weeks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_workouts: {
+        Row: {
+          day_of_week: number
+          distance_km: number | null
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          week_id: string
+          workout_type: string
+        }
+        Insert: {
+          day_of_week: number
+          distance_km?: number | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          week_id: string
+          workout_type: string
+        }
+        Update: {
+          day_of_week?: number
+          distance_km?: number | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          week_id?: string
+          workout_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_workouts_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "training_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_training_progress: {
+        Row: {
+          completed_at: string
+          id: string
+          plan_id: string
+          user_id: string
+          workout_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          plan_id: string
+          user_id: string
+          workout_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          plan_id?: string
+          user_id?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_training_progress_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_training_progress_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "training_workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +646,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "member"],
+    },
   },
 } as const
