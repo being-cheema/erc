@@ -4,6 +4,7 @@ import { ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingSlide from "./OnboardingSlide";
 import ParticleField from "./ParticleField";
+import { useHaptics } from "@/hooks/useHaptics";
 import logo from "@/assets/logo.png";
 
 const slides = [
@@ -42,36 +43,47 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(0);
   const constraintsRef = useRef(null);
+  const { lightImpact, mediumImpact, heavyImpact, selectionChanged, notificationSuccess } = useHaptics();
 
   const nextSlide = useCallback(() => {
     if (currentSlide < slides.length - 1) {
+      mediumImpact();
       setDirection(1);
       setCurrentSlide(currentSlide + 1);
     } else {
+      heavyImpact();
+      notificationSuccess();
       onComplete();
     }
-  }, [currentSlide, onComplete]);
+  }, [currentSlide, onComplete, mediumImpact, heavyImpact, notificationSuccess]);
 
   const prevSlide = useCallback(() => {
     if (currentSlide > 0) {
+      lightImpact();
       setDirection(-1);
       setCurrentSlide(currentSlide - 1);
     }
-  }, [currentSlide]);
+  }, [currentSlide, lightImpact]);
 
   const goToSlide = (index: number) => {
+    selectionChanged();
     setDirection(index > currentSlide ? 1 : -1);
     setCurrentSlide(index);
   };
 
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 50;
     if (info.offset.x < -threshold && currentSlide < slides.length - 1) {
       nextSlide();
     } else if (info.offset.x > threshold && currentSlide > 0) {
       prevSlide();
     }
-  };
+  }, [currentSlide, nextSlide, prevSlide]);
+
+  const handleSkip = useCallback(() => {
+    lightImpact();
+    onComplete();
+  }, [lightImpact, onComplete]);
 
   const isLastSlide = currentSlide === slides.length - 1;
 
@@ -334,7 +346,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
             >
               <Button
                 variant="ghost"
-                onClick={onComplete}
+                onClick={handleSkip}
                 className="w-full h-12 text-muted-foreground/70 hover:text-muted-foreground hover:bg-white/5"
               >
                 Skip
