@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Loader2, Activity } from "lucide-react";
+import { Loader2, Activity, CheckCircle } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import StatsTabs from "@/components/stats/StatsTabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,8 +23,8 @@ const Stats = () => {
         animate={{ opacity: 1, y: 0 }}
         className="px-4 pt-6 pb-4"
       >
-        <h1 className="text-2xl font-bold text-foreground">Statistics</h1>
-        <p className="text-muted-foreground text-sm">Your running journey in numbers</p>
+        <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Statistics</h1>
+        <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mt-1">Your running journey</p>
       </motion.header>
 
       <div className="px-4 space-y-4">
@@ -38,18 +38,16 @@ const Stats = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="border-success/30 bg-success/5">
+            <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-6 h-6 text-strava" fill="currentColor">
-                      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                    </svg>
+                  <div className="w-12 h-12 bg-primary flex items-center justify-center shrink-0">
+                    <CheckCircle className="w-6 h-6 text-primary-foreground" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground font-sans">Strava Connected</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Your data syncs automatically
+                    <h3 className="font-bold uppercase tracking-wide text-foreground text-sm">Strava Connected</h3>
+                    <p className="text-muted-foreground text-xs font-medium mt-0.5">
+                      Data syncs automatically
                     </p>
                   </div>
                 </div>
@@ -62,13 +60,13 @@ const Stats = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="border-primary/30 bg-primary/5">
+            <Card className="border-border bg-card">
               <CardContent className="p-6 text-center">
-                <div className="w-16 h-16 mx-auto rounded-full gradient-primary flex items-center justify-center mb-4 glow-primary">
-                  <Activity className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 mx-auto bg-primary flex items-center justify-center mb-4">
+                  <Activity className="w-8 h-8 text-primary-foreground" />
                 </div>
-                <h3 className="font-semibold text-foreground mb-2 font-sans">No Activity Data</h3>
-                <p className="text-muted-foreground text-sm mb-4">
+                <h3 className="font-bold uppercase tracking-wide text-foreground mb-2 text-sm">No Activity Data</h3>
+                <p className="text-muted-foreground text-xs font-medium">
                   Connect your Strava account to see your running statistics here.
                 </p>
               </CardContent>
