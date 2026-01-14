@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
+import StravaCallback from "./pages/StravaCallback";
 import Home from "./pages/Home";
 import Races from "./pages/Races";
 import Stats from "./pages/Stats";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/onboarding" replace />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<StravaCallback />} />
             <Route element={<AppLayout />}>
               <Route path="/home" element={<Home />} />
               <Route path="/races" element={<Races />} />
