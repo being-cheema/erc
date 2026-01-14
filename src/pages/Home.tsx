@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Activity, Settings } from "lucide-react";
+import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Settings } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -16,8 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 const Home = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: user } = useCurrentUser();
+  const { data: profile } = useProfile();
   const { data: races } = useRaces();
 
   const {
@@ -70,30 +69,22 @@ const Home = () => {
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="px-4 pt-6 pb-4"
+        className="px-5 pt-6 pb-4"
         style={{ transform: `translateY(${pullDistance * 0.3}px)` }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="Erode Runners" className="h-10 w-auto" />
+            <img src={logo} alt="Erode Runners" className="h-11 w-auto rounded-xl" />
             <div>
-              <p className="text-muted-foreground text-sm">{getGreeting()},</p>
-              <h1 className="text-xl font-bold text-foreground font-sans">
+              <p className="text-muted-foreground text-sm font-medium">{getGreeting()}</p>
+              <h1 className="text-xl font-bold text-foreground">
                 {profile?.display_name || "Runner"}
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate("/settings")}
-              className="rounded-full text-muted-foreground hover:text-foreground"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
+          <div className="flex items-center gap-1">
             <Avatar 
-              className="w-10 h-10 border-2 border-primary/20 cursor-pointer"
+              className="w-10 h-10 border-2 border-primary/30 cursor-pointer"
               onClick={() => navigate("/settings")}
             >
               <AvatarImage src={profile?.avatar_url || undefined} />
@@ -105,43 +96,41 @@ const Home = () => {
               variant="ghost" 
               size="icon" 
               onClick={handleLogout}
-              className="rounded-full text-muted-foreground hover:text-foreground"
+              className="rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </div>
       </motion.header>
 
-      <div className="px-4 space-y-4">
+      <div className="px-5 space-y-4">
         {/* Monthly Stats Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="overflow-hidden border-0 luxury-shadow-lg">
-            <CardContent className="p-0">
-              <div className="gradient-primary p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-white/90 font-medium font-sans text-sm uppercase tracking-wide">This Month</h2>
-                  <TrendingUp className="w-5 h-5 text-white/70" />
-                </div>
-                <div className="flex items-end gap-1">
-                  <span className="text-5xl font-bold text-white">
-                    {(Number(monthlyDistance) / 1000).toFixed(1)}
-                  </span>
-                  <span className="text-white/70 mb-2 text-lg">km</span>
-                </div>
-                <p className="text-white/70 text-sm mt-2">
-                  {monthlyRuns} runs completed
-                </p>
+          <Card className="overflow-hidden border-0 bg-gradient-to-br from-primary to-accent shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-primary-foreground/80 text-sm font-semibold uppercase tracking-wider">This Month</span>
+                <TrendingUp className="w-5 h-5 text-primary-foreground/60" />
               </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-5xl font-bold text-primary-foreground tracking-tight">
+                  {(Number(monthlyDistance) / 1000).toFixed(1)}
+                </span>
+                <span className="text-primary-foreground/70 text-xl font-medium">km</span>
+              </div>
+              <p className="text-primary-foreground/70 text-sm mt-2 font-medium">
+                {monthlyRuns} runs completed
+              </p>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Quick Stats Grid */}
+        {/* Stats Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -149,35 +138,35 @@ const Home = () => {
           className="grid grid-cols-2 gap-3"
         >
           <Card 
-            className="cursor-pointer card-hover border-border/50"
+            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
             onClick={() => navigate("/leaderboard")}
           >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl gradient-gold flex items-center justify-center">
-                  <Trophy className="w-5 h-5 text-white" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-sm">
+                  <Trophy className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Rank</p>
-                  <p className="text-xl font-bold text-foreground font-sans">—</p>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Rank</p>
+                  <p className="text-2xl font-bold text-foreground">—</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card 
-            className="cursor-pointer card-hover border-border/50"
+            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
             onClick={() => navigate("/stats")}
           >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-success flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-white" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-success to-emerald-600 flex items-center justify-center shadow-sm">
+                  <Zap className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Streak</p>
-                  <p className="text-xl font-bold text-foreground font-sans">
-                    {currentStreak} <span className="text-sm font-normal text-muted-foreground">days</span>
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Streak</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {currentStreak}<span className="text-sm font-medium text-muted-foreground ml-1">days</span>
                   </p>
                 </div>
               </div>
@@ -192,20 +181,20 @@ const Home = () => {
           transition={{ delay: 0.3 }}
         >
           <Card 
-            className="cursor-pointer card-hover border-border/50"
+            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
             onClick={() => navigate("/races")}
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center">
                     <Calendar className="w-7 h-7 text-accent" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground font-sans">
+                    <h3 className="font-semibold text-foreground text-base">
                       {upcomingRace ? upcomingRace.name : "Upcoming Races"}
                     </h3>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-muted-foreground text-sm font-medium">
                       {upcomingRace 
                         ? format(new Date(upcomingRace.race_date), "MMM d, yyyy")
                         : "View all events"
@@ -219,40 +208,14 @@ const Home = () => {
           </Card>
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { icon: Activity, label: "Stats", path: "/stats", color: "text-primary" },
-              { icon: Trophy, label: "Ranks", path: "/leaderboard", color: "text-warning" },
-              { icon: Calendar, label: "Races", path: "/races", color: "text-accent" },
-              { icon: TrendingUp, label: "Training", path: "/training", color: "text-success" },
-            ].map((action) => (
-              <button
-                key={action.label}
-                onClick={() => navigate(action.path)}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-card hover:bg-muted/50 transition-all border border-border/50 card-hover"
-              >
-                <action.icon className={`w-6 h-6 ${action.color}`} />
-                <span className="text-xs text-muted-foreground font-medium">{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-
         {/* Strava Connected Status */}
         {profile?.strava_id && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.4 }}
           >
-            <Card className="border-success/30 bg-success/5">
+            <Card className="border-strava/20 bg-strava/5">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
@@ -261,9 +224,9 @@ const Home = () => {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground font-sans">Strava Connected</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Your activities are synced automatically
+                    <h3 className="font-semibold text-foreground">Strava Connected</h3>
+                    <p className="text-muted-foreground text-sm font-medium">
+                      Activities synced • Pull down to refresh
                     </p>
                   </div>
                 </div>
