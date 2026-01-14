@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Settings } from "lucide-react";
+import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Dumbbell } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,8 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefresh from "@/components/PullToRefresh";
 import { useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
+import GoalProgress from "@/components/home/GoalProgress";
+import RecentActivity from "@/components/home/RecentActivity";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ const Home = () => {
     handleTouchEnd,
   } = usePullToRefresh(() => {
     queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["activities"] });
     queryClient.invalidateQueries({ queryKey: ["monthlyLeaderboard"] });
     queryClient.invalidateQueries({ queryKey: ["allTimeLeaderboard"] });
   });
@@ -57,8 +60,6 @@ const Home = () => {
     navigate(path);
   };
 
-  const monthlyDistance = profile?.total_distance || 0;
-  const monthlyRuns = profile?.total_runs || 0;
   const currentStreak = profile?.current_streak || 0;
 
   return (
@@ -115,30 +116,8 @@ const Home = () => {
       </motion.header>
 
       <div className="px-5 space-y-4">
-        {/* Monthly Stats Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="overflow-hidden border-0 bg-gradient-to-br from-primary to-accent shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-primary-foreground/80 text-sm font-semibold uppercase tracking-wider">This Month</span>
-                <TrendingUp className="w-5 h-5 text-primary-foreground/60" />
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-5xl font-bold text-primary-foreground tracking-tight">
-                  {(Number(monthlyDistance) / 1000).toFixed(1)}
-                </span>
-                <span className="text-primary-foreground/70 text-xl font-medium">km</span>
-              </div>
-              <p className="text-primary-foreground/70 text-sm mt-2 font-medium">
-                {monthlyRuns} runs completed
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Goal Progress */}
+        <GoalProgress />
 
         {/* Stats Grid */}
         <motion.div
@@ -184,35 +163,55 @@ const Home = () => {
           </Card>
         </motion.div>
 
-        {/* Next Race Card */}
+        {/* Recent Activity */}
+        <RecentActivity />
+
+        {/* Quick Actions Row */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="grid grid-cols-2 gap-3"
         >
+          {/* Next Race Card */}
           <Card 
             className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
             onClick={() => handleCardTap("/races")}
           >
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center">
-                    <Calendar className="w-7 h-7 text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground text-base">
-                      {upcomingRace ? upcomingRace.name : "Upcoming Races"}
-                    </h3>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      {upcomingRace 
-                        ? format(new Date(upcomingRace.race_date), "MMM d, yyyy")
-                        : "View all events"
-                      }
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-accent" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium uppercase">Next Race</p>
+                  <p className="font-semibold text-foreground text-sm truncate">
+                    {upcomingRace 
+                      ? format(new Date(upcomingRace.race_date), "MMM d")
+                      : "View All"
+                    }
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Training Card */}
+          <Card 
+            className="cursor-pointer active:scale-[0.98] transition-transform border-border/50 bg-card"
+            onClick={() => handleCardTap("/training")}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Dumbbell className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium uppercase">Training</p>
+                  <p className="font-semibold text-foreground text-sm">
+                    View Plans
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -228,17 +227,18 @@ const Home = () => {
             <Card className="border-strava/20 bg-strava/5">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 24 24" className="w-6 h-6 text-strava" fill="currentColor">
+                  <div className="w-10 h-10 rounded-full bg-strava/10 flex items-center justify-center shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-strava" fill="currentColor">
                       <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">Strava Connected</h3>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Activities synced • Pull down to refresh
+                    <h3 className="font-medium text-foreground text-sm">Strava Connected</h3>
+                    <p className="text-muted-foreground text-xs">
+                      Pull down to sync latest activities
                     </p>
                   </div>
+                  <TrendingUp className="w-4 h-4 text-strava" />
                 </div>
               </CardContent>
             </Card>

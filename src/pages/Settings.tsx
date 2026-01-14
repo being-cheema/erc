@@ -33,6 +33,7 @@ const Settings = () => {
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [monthlyGoal, setMonthlyGoal] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch notification preferences
@@ -64,6 +65,7 @@ const Settings = () => {
     if (profile) {
       setDisplayName(profile.display_name || "");
       setAvatarUrl(profile.avatar_url || "");
+      setMonthlyGoal(Math.round((profile.monthly_distance_goal as number || 100000) / 1000));
     }
   }, [profile]);
 
@@ -88,6 +90,7 @@ const Settings = () => {
         .update({
           display_name: displayName,
           avatar_url: avatarUrl,
+          monthly_distance_goal: monthlyGoal * 1000, // Convert km to meters
         })
         .eq("user_id", user.id);
       
@@ -227,6 +230,25 @@ const Settings = () => {
                   placeholder="Your name"
                   className="mt-1"
                 />
+              </div>
+
+              {/* Monthly Goal */}
+              <div>
+                <Label htmlFor="monthlyGoal" className="text-sm text-muted-foreground">
+                  Monthly Distance Goal (km)
+                </Label>
+                <Input
+                  id="monthlyGoal"
+                  type="number"
+                  value={monthlyGoal}
+                  onChange={(e) => setMonthlyGoal(Number(e.target.value))}
+                  min={1}
+                  max={1000}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Set your target distance for each month
+                </p>
               </div>
 
               <Button

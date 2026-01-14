@@ -406,6 +406,36 @@ Deno.serve(async (req) => {
         const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
         const totalRunsCount = allRuns.length;
 
+        // Store individual activities in activities table
+        try {
+          for (const run of allRuns) {
+            // Calculate average pace (seconds per km)
+            const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
+            
+            // Upsert activity (insert or update if exists)
+            await supabaseAdmin
+              .from("activities")
+              .upsert({
+                user_id: profile.user_id,
+                strava_id: run.id,
+                name: run.name,
+                distance: run.distance,
+                moving_time: run.moving_time,
+                start_date: run.start_date,
+                average_pace: avgPace,
+                activity_type: run.type,
+                calories: Math.round((run.distance / 1000) * 60), // Estimate ~60 cal/km
+                elevation_gain: 0, // Would need to fetch from detailed activity
+              }, {
+                onConflict: 'strava_id',
+              });
+          }
+          console.log(`Stored ${allRuns.length} activities for user ${profile.user_id}`);
+        } catch (activityError) {
+          console.error("Error storing activities:", activityError);
+          // Don't fail the sync if activity storage fails
+        }
+
         // Calculate streak from run dates
         const runDates = allRuns.map((r) => new Date(r.start_date));
         const { currentStreak, longestStreak } = calculateStreaks(runDates);
