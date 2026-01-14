@@ -1,14 +1,14 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Calendar, BarChart3, Trophy, Settings } from "lucide-react";
+import { Home, Calendar, BarChart3, Trophy, Medal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useHaptics } from "@/hooks/useHaptics";
 
 const navItems = [
   { path: "/home", icon: Home, label: "Home" },
   { path: "/races", icon: Calendar, label: "Races" },
-  { path: "/stats", icon: BarChart3, label: "Stats" },
   { path: "/leaderboard", icon: Trophy, label: "Ranks" },
-  { path: "/settings", icon: Settings, label: "Settings" },
+  { path: "/achievements", icon: Medal, label: "Badges" },
+  { path: "/stats", icon: BarChart3, label: "Stats" },
 ];
 
 const BottomNav = () => {
