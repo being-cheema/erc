@@ -468,12 +468,14 @@ Deno.serve(async (req) => {
 
         let allRuns: StravaActivity[];
         let monthlyRuns: StravaActivity[];
+        let newActivitiesToStore: StravaActivity[] = [];
 
         if (needsFullSync) {
           // Full historical sync - fetch ALL activities
           console.log(`Full sync for user ${profile.user_id} - fetching all activities`);
           const allActivities = await fetchAllStravaActivities(accessToken);
           allRuns = allActivities.filter((a) => a.type === "Run");
+          newActivitiesToStore = allRuns;
           
           // Filter for current month
           const startOfMonth = new Date();
@@ -486,22 +488,105 @@ Deno.serve(async (req) => {
           
           console.log(`Found ${allRuns.length} total runs, ${monthlyRuns.length} this month`);
         } else {
-          // Regular sync - only current month activities
-          console.log(`Regular sync for user ${profile.user_id}`);
+          // Incremental sync - fetch activities since last stored activity
+          console.log(`Incremental sync for user ${profile.user_id}`);
+          
+          // Get the most recent activity from database to know where to sync from
+          const { data: lastActivity } = await supabaseAdmin
+            .from("activities")
+            .select("start_date")
+            .eq("user_id", profile.user_id)
+            .order("start_date", { ascending: false })
+            .limit(1)
+            .single();
+          
           const startOfMonth = new Date();
           startOfMonth.setDate(1);
           startOfMonth.setHours(0, 0, 0, 0);
-
-          const activities = await fetchStravaActivitiesPage(
-            accessToken,
-            1,
-            Math.floor(startOfMonth.getTime() / 1000)
+          
+          // If we have a last activity, sync from there; otherwise sync from start of month
+          let afterTimestamp: number;
+          if (lastActivity?.start_date) {
+            // Sync from last activity date (subtract 1 day to catch any edge cases)
+            const lastDate = new Date(lastActivity.start_date);
+            lastDate.setDate(lastDate.getDate() - 1);
+            afterTimestamp = Math.floor(lastDate.getTime() / 1000);
+            console.log(`Syncing activities after ${lastDate.toISOString()}`);
+          } else {
+            // No stored activities, sync from start of month
+            afterTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+            console.log(`No stored activities, syncing from ${startOfMonth.toISOString()}`);
+          }
+          
+          // Fetch ALL activities since the after timestamp (paginated)
+          let newActivities: StravaActivity[] = [];
+          let page = 1;
+          let hasMore = true;
+          
+          while (hasMore) {
+            const activities = await fetchStravaActivitiesPage(accessToken, page, afterTimestamp);
+            if (activities.length === 0) {
+              hasMore = false;
+            } else {
+              newActivities = [...newActivities, ...activities];
+              page++;
+              // Safety limit
+              if (page > 20) break;
+            }
+          }
+          
+          const newRuns = newActivities.filter((a) => a.type === "Run");
+          newActivitiesToStore = newRuns;
+          console.log(`Found ${newRuns.length} new runs since last sync`);
+          
+          // Filter for current month stats
+          monthlyRuns = newRuns.filter(
+            (a) => new Date(a.start_date) >= startOfMonth
           );
-          monthlyRuns = activities.filter((a) => a.type === "Run");
-
-          // Get more activities for all-time stats (limited to 200 for regular sync)
-          const allActivities = await fetchStravaActivitiesPage(accessToken, 1);
-          allRuns = allActivities.filter((a) => a.type === "Run");
+          
+          // For total stats, we need to get ALL stored activities + new ones
+          const { data: storedActivities } = await supabaseAdmin
+            .from("activities")
+            .select("distance, start_date, strava_id")
+            .eq("user_id", profile.user_id);
+          
+          // Combine stored with new (avoiding duplicates)
+          const storedStravaIds = new Set(storedActivities?.map(a => a.strava_id) || []);
+          const uniqueNewRuns = newRuns.filter(r => !storedStravaIds.has(r.id));
+          
+          // Create combined list for stats calculation
+          const storedRunData = storedActivities || [];
+          allRuns = [
+            ...uniqueNewRuns,
+            ...storedRunData.map(a => ({
+              id: a.strava_id || 0,
+              name: '',
+              distance: Number(a.distance) || 0,
+              moving_time: 0,
+              elapsed_time: 0,
+              type: 'Run',
+              start_date: a.start_date || '',
+            }))
+          ];
+          
+          // Update monthly runs to include stored ones too
+          const storedMonthlyRuns = storedRunData.filter(
+            a => a.start_date && new Date(a.start_date) >= startOfMonth
+          );
+          monthlyRuns = [
+            ...monthlyRuns,
+            ...storedMonthlyRuns.map(a => ({
+              id: 0,
+              name: '',
+              distance: Number(a.distance) || 0,
+              moving_time: 0,
+              elapsed_time: 0,
+              type: 'Run',
+              start_date: a.start_date || '',
+            }))
+          ];
+          
+          console.log(`Total runs (stored + new): ${allRuns.length}, Monthly: ${monthlyRuns.length}`);
         }
 
         // Fetch athlete profile data
@@ -513,8 +598,8 @@ Deno.serve(async (req) => {
           console.error("Error fetching athlete:", athleteError);
         }
 
-        // Fetch detailed data for recent activities (heart rate, elevation, etc.)
-        const activityDetails = await fetchRecentActivityDetails(accessToken, allRuns, 50);
+        // Fetch detailed data for activities we're storing (heart rate, elevation, etc.)
+        const activityDetails = await fetchRecentActivityDetails(accessToken, newActivitiesToStore, 50);
 
         // Calculate totals
         const monthlyDistance = monthlyRuns.reduce((sum, a) => sum + a.distance, 0);
@@ -530,7 +615,7 @@ Deno.serve(async (req) => {
 
         // Store individual activities in activities table with detailed data
         try {
-          for (const run of allRuns) {
+          for (const run of newActivitiesToStore) {
             const detail = activityDetails.get(run.id);
             
             // Calculate average pace (seconds per km)
@@ -569,7 +654,7 @@ Deno.serve(async (req) => {
                 onConflict: 'strava_id',
               });
           }
-          console.log(`Stored ${allRuns.length} activities with detailed data for user ${profile.user_id}`);
+          console.log(`Stored ${newActivitiesToStore.length} activities with detailed data for user ${profile.user_id}`);
         } catch (activityError) {
           console.error("Error storing activities:", activityError);
           // Don't fail the sync if activity storage fails
@@ -586,6 +671,7 @@ Deno.serve(async (req) => {
           current_streak: currentStreak,
           longest_streak: longestStreak,
           updated_at: new Date().toISOString(),
+          last_synced_at: new Date().toISOString(),
         };
 
         // Add athlete data if available
