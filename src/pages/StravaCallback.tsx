@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,11 +24,23 @@ const StravaCallback = () => {
     message: "Connecting to Strava...",
   });
   const [canRetry, setCanRetry] = useState(false);
-  const syncTriggered = useRef(false);
+  const processedCode = useRef<string | null>(null);
+  const isProcessing = useRef(false);
 
-  const handleCallback = async () => {
+  const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
     const error = searchParams.get("error");
+
+    // Prevent double processing - Strava codes are single-use
+    if (isProcessing.current) {
+      console.log("Already processing, skipping...");
+      return;
+    }
+
+    if (processedCode.current === code) {
+      console.log("Code already processed, skipping...");
+      return;
+    }
 
     if (error) {
       setSyncState({
@@ -49,6 +61,10 @@ const StravaCallback = () => {
       setCanRetry(true);
       return;
     }
+
+    // Mark as processing immediately
+    isProcessing.current = true;
+    processedCode.current = code;
 
     try {
       setSyncState({ step: "auth", message: "Exchanging tokens...", progress: 10 });
@@ -98,11 +114,16 @@ const StravaCallback = () => {
       });
 
       try {
+        // Get the current session for auth header
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authToken = sessionData?.session?.access_token;
+
         const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
         const syncResponse = await fetch(syncUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
           },
           body: JSON.stringify({
             user_id: userId,
@@ -111,7 +132,23 @@ const StravaCallback = () => {
 
         const syncData = await syncResponse.json();
 
-        if (syncData.success && syncData.results?.[0]) {
+        if (syncData.synced !== undefined) {
+          setSyncState({
+            step: "calculating",
+            message: `Found ${syncData.synced || 0} runs! Calculating your stats...`,
+            activitiesFound: syncData.synced,
+            progress: 70,
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 800));
+
+          setSyncState({
+            step: "complete",
+            message: `You're all set, ${athleteName}!`,
+            activitiesFound: syncData.synced,
+            progress: 100,
+          });
+        } else if (syncData.success && syncData.results?.[0]) {
           const result = syncData.results[0];
           
           if (result.success) {
@@ -171,6 +208,7 @@ const StravaCallback = () => {
       navigate("/home");
     } catch (err) {
       console.error("Callback error:", err);
+      isProcessing.current = false;
       setSyncState({
         step: "error",
         message: "Connection failed",
@@ -178,15 +216,16 @@ const StravaCallback = () => {
       });
       setCanRetry(true);
     }
-  };
+  }, [searchParams, navigate]);
 
   useEffect(() => {
-    if (syncTriggered.current) return;
-    syncTriggered.current = true;
     handleCallback();
-  }, [searchParams]);
+  }, [handleCallback]);
 
   const handleRetry = () => {
+    // Clear the processed code so user can try again
+    processedCode.current = null;
+    isProcessing.current = false;
     navigate("/login");
   };
 
