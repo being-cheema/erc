@@ -84,9 +84,10 @@ Deno.serve(async (req) => {
         .from("profiles")
         .select("user_id")
         .eq("strava_id", athlete.id.toString())
-        .single();
+        .maybeSingle();
 
       let userId: string;
+      let isNewUser = false;
 
       if (existingProfile) {
         // User exists, update tokens
@@ -105,6 +106,7 @@ Deno.serve(async (req) => {
           .eq("user_id", userId);
       } else {
         // Create new user in auth.users
+        isNewUser = true;
         const email = `strava_${athlete.id}@eroderunners.local`;
         const password = crypto.randomUUID();
 
@@ -146,6 +148,11 @@ Deno.serve(async (req) => {
           user_id: userId,
           role: "member",
         });
+
+        // Create default notification preferences
+        await supabase.from("notification_preferences").insert({
+          user_id: userId,
+        });
       }
 
       // Generate a magic link for the user to sign in
@@ -172,6 +179,7 @@ Deno.serve(async (req) => {
           success: true,
           user_id: userId,
           token: token,
+          is_new_user: isNewUser,
           athlete: {
             id: athlete.id,
             firstname: athlete.firstname,

@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Target, Clock, ChevronRight, Loader2, Dumbbell } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTrainingPlans } from "@/hooks/useTrainingPlans";
+import { useNavigate } from "react-router-dom";
+import { useHaptics } from "@/hooks/useHaptics";
 
 const Training = () => {
   const { data: plans, isLoading } = useTrainingPlans();
@@ -18,6 +20,9 @@ const Training = () => {
         return { bg: "bg-primary", text: "text-white" };
     }
   };
+
+  const navigate = useNavigate();
+  const { lightImpact } = useHaptics();
 
   return (
     <div className="min-h-screen bg-background safe-area-inset-top pb-24">
@@ -56,6 +61,10 @@ const Training = () => {
             return (
               <motion.div
                 key={plan.id}
+                onClick={() => {
+                  lightImpact();
+                  navigate(`/training/${plan.id}`);
+                }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}

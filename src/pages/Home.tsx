@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile, useCurrentUser } from "@/hooks/useProfile";
 import { useRaces } from "@/hooks/useRaces";
+import { useUserRank } from "@/hooks/useUserRank";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -19,6 +20,7 @@ const Home = () => {
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const { data: races } = useRaces();
+  const { data: userRank } = useUserRank();
   const { lightImpact, mediumImpact } = useHaptics();
 
   const {
@@ -156,7 +158,7 @@ const Home = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Rank</p>
-                  <p className="text-2xl font-bold text-foreground">—</p>
+                  <p className="text-2xl font-bold text-foreground">{userRank?.rank ? `#${userRank.rank}` : "—"}</p>
                 </div>
               </div>
             </CardContent>
