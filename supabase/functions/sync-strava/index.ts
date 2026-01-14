@@ -20,38 +20,43 @@ async function refreshToken(
   userId: string,
   refreshTokenValue: string
 ): Promise<string | null> {
-  const clientId = Deno.env.get("STRAVA_CLIENT_ID");
-  const clientSecret = Deno.env.get("STRAVA_CLIENT_SECRET");
+  try {
+    const clientId = Deno.env.get("STRAVA_CLIENT_ID");
+    const clientSecret = Deno.env.get("STRAVA_CLIENT_SECRET");
 
-  const response = await fetch("https://www.strava.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshTokenValue,
-      grant_type: "refresh_token",
-    }),
-  });
+    const response = await fetch("https://www.strava.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshTokenValue,
+        grant_type: "refresh_token",
+      }),
+    });
 
-  if (!response.ok) {
-    console.error("Failed to refresh token:", await response.text());
+    if (!response.ok) {
+      console.error("Failed to refresh token:", await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Update tokens in database
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        strava_access_token: data.access_token,
+        strava_refresh_token: data.refresh_token,
+        strava_token_expires_at: new Date(data.expires_at * 1000).toISOString(),
+      })
+      .eq("user_id", userId);
+
+    return data.access_token;
+  } catch (error) {
+    console.error("Token refresh error:", error);
     return null;
   }
-
-  const data = await response.json();
-
-  // Update tokens in database
-  await supabaseAdmin
-    .from("profiles")
-    .update({
-      strava_access_token: data.access_token,
-      strava_refresh_token: data.refresh_token,
-      strava_token_expires_at: new Date(data.expires_at * 1000).toISOString(),
-    })
-    .eq("user_id", userId);
-
-  return data.access_token;
 }
 
 async function fetchStravaActivitiesPage(
@@ -76,6 +81,8 @@ async function fetchStravaActivitiesPage(
   );
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Strava API error: ${response.status} - ${errorText}`);
     throw new Error(`Strava API error: ${response.status}`);
   }
 
@@ -84,30 +91,33 @@ async function fetchStravaActivitiesPage(
 
 // Fetch ALL activities with pagination for full historical sync
 async function fetchAllStravaActivities(
-  accessToken: string,
-  onProgress?: (count: number) => void
+  accessToken: string
 ): Promise<StravaActivity[]> {
   let allActivities: StravaActivity[] = [];
   let page = 1;
   let hasMore = true;
 
   while (hasMore) {
-    const activities = await fetchStravaActivitiesPage(accessToken, page);
-    
-    if (activities.length === 0) {
-      hasMore = false;
-    } else {
-      allActivities = [...allActivities, ...activities];
-      if (onProgress) {
-        onProgress(allActivities.length);
-      }
-      page++;
+    try {
+      const activities = await fetchStravaActivitiesPage(accessToken, page);
       
-      // Safety limit to prevent infinite loops (max ~10000 activities)
-      if (page > 50) {
-        console.log("Reached page limit, stopping pagination");
-        break;
+      if (activities.length === 0) {
+        hasMore = false;
+      } else {
+        allActivities = [...allActivities, ...activities];
+        console.log(`Fetched page ${page}: ${activities.length} activities (total: ${allActivities.length})`);
+        page++;
+        
+        // Safety limit to prevent infinite loops (max ~10000 activities)
+        if (page > 50) {
+          console.log("Reached page limit, stopping pagination");
+          break;
+        }
       }
+    } catch (error) {
+      console.error(`Error fetching page ${page}:`, error);
+      // Return what we have so far instead of failing completely
+      break;
     }
   }
 
@@ -180,69 +190,72 @@ async function checkAndUnlockAchievements(
     longestStreak: number;
   }
 ): Promise<string[]> {
-  const unlockedAchievements: string[] = [];
+  try {
+    const unlockedAchievements: string[] = [];
 
-  // Get all achievements
-  const { data: achievements } = await supabaseAdmin
-    .from("achievements")
-    .select("*");
+    // Get all achievements
+    const { data: achievements, error: achievementsError } = await supabaseAdmin
+      .from("achievements")
+      .select("*");
 
-  if (!achievements || achievements.length === 0) {
-    return [];
-  }
-
-  // Get user's existing achievements
-  const { data: existingAchievements } = await supabaseAdmin
-    .from("user_achievements")
-    .select("achievement_id")
-    .eq("user_id", userId);
-
-  const existingIds = new Set(existingAchievements?.map((a: any) => a.achievement_id) || []);
-
-  for (const achievement of achievements) {
-    if (existingIds.has(achievement.id)) {
-      continue; // Already unlocked
+    if (achievementsError || !achievements || achievements.length === 0) {
+      console.log("No achievements found or error:", achievementsError);
+      return [];
     }
 
-    let qualified = false;
-    const reqType = achievement.requirement_type;
-    const reqValue = achievement.requirement_value;
+    // Get user's existing achievements
+    const { data: existingAchievements } = await supabaseAdmin
+      .from("user_achievements")
+      .select("achievement_id")
+      .eq("user_id", userId);
 
-    switch (reqType) {
-      case "total_distance":
-        qualified = stats.totalDistance >= reqValue;
-        break;
-      case "total_runs":
-        qualified = stats.totalRuns >= reqValue;
-        break;
-      case "current_streak":
-        qualified = stats.currentStreak >= reqValue;
-        break;
-      case "longest_streak":
-        qualified = stats.longestStreak >= reqValue;
-        break;
-      case "single_run_distance":
-        // This would need to be checked against individual runs
-        break;
-      default:
-        break;
-    }
+    const existingIds = new Set(existingAchievements?.map((a: any) => a.achievement_id) || []);
 
-    if (qualified) {
-      const { error } = await supabaseAdmin
-        .from("user_achievements")
-        .insert({
-          user_id: userId,
-          achievement_id: achievement.id,
-        });
+    for (const achievement of achievements) {
+      if (existingIds.has(achievement.id)) {
+        continue; // Already unlocked
+      }
 
-      if (!error) {
-        unlockedAchievements.push(achievement.name);
+      let qualified = false;
+      const reqType = achievement.requirement_type;
+      const reqValue = achievement.requirement_value;
+
+      switch (reqType) {
+        case "total_distance":
+          qualified = stats.totalDistance >= reqValue;
+          break;
+        case "total_runs":
+          qualified = stats.totalRuns >= reqValue;
+          break;
+        case "current_streak":
+          qualified = stats.currentStreak >= reqValue;
+          break;
+        case "longest_streak":
+          qualified = stats.longestStreak >= reqValue;
+          break;
+        default:
+          break;
+      }
+
+      if (qualified) {
+        const { error } = await supabaseAdmin
+          .from("user_achievements")
+          .insert({
+            user_id: userId,
+            achievement_id: achievement.id,
+          });
+
+        if (!error) {
+          unlockedAchievements.push(achievement.name);
+        }
       }
     }
-  }
 
-  return unlockedAchievements;
+    return unlockedAchievements;
+  } catch (error) {
+    console.error("Achievement check error:", error);
+    return [];
+  }
 }
 
 Deno.serve(async (req) => {
@@ -256,13 +269,13 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body for options
-    let isInitialSync = false;
+    let forceFullSync = false;
     let targetUserId: string | null = null;
     
     if (req.method === "POST") {
       try {
         const body = await req.json();
-        isInitialSync = body.initial_sync === true;
+        forceFullSync = body.force_full_sync === true;
         targetUserId = body.user_id || null;
       } catch {
         // No body, continue with defaults
@@ -284,7 +297,7 @@ Deno.serve(async (req) => {
     // If no specific user, sync all users with Strava connected
     const query = supabaseAdmin
       .from("profiles")
-      .select("user_id, strava_access_token, strava_refresh_token, strava_token_expires_at")
+      .select("user_id, strava_access_token, strava_refresh_token, strava_token_expires_at, total_runs, total_distance")
       .not("strava_id", "is", null);
 
     if (userId) {
@@ -294,7 +307,18 @@ Deno.serve(async (req) => {
     const { data: profiles, error: profilesError } = await query;
 
     if (profilesError) {
-      throw profilesError;
+      console.error("Profile fetch error:", profilesError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to fetch profiles" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, message: "No profiles to sync", results: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const results: { 
@@ -303,15 +327,25 @@ Deno.serve(async (req) => {
       activities?: number; 
       error?: string;
       newAchievements?: string[];
+      needsFullSync?: boolean;
     }[] = [];
 
-    for (const profile of profiles || []) {
+    for (const profile of profiles) {
       try {
         let accessToken = profile.strava_access_token;
+
+        if (!accessToken) {
+          results.push({ userId: profile.user_id, success: false, error: "No access token" });
+          continue;
+        }
 
         // Check if token is expired
         const expiresAt = new Date(profile.strava_token_expires_at || 0);
         if (expiresAt < new Date()) {
+          if (!profile.strava_refresh_token) {
+            results.push({ userId: profile.user_id, success: false, error: "No refresh token" });
+            continue;
+          }
           accessToken = await refreshToken(
             supabaseAdmin,
             profile.user_id,
@@ -323,12 +357,17 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Determine if we need full sync: if user has no data OR force_full_sync is true
+        const needsFullSync = forceFullSync || 
+          (profile.total_runs === null || profile.total_runs === 0) ||
+          (profile.total_distance === null || profile.total_distance === 0);
+
         let allRuns: StravaActivity[];
         let monthlyRuns: StravaActivity[];
 
-        if (isInitialSync) {
+        if (needsFullSync) {
           // Full historical sync - fetch ALL activities
-          console.log(`Initial sync for user ${profile.user_id} - fetching all activities`);
+          console.log(`Full sync for user ${profile.user_id} - fetching all activities`);
           const allActivities = await fetchAllStravaActivities(accessToken);
           allRuns = allActivities.filter((a) => a.type === "Run");
           
@@ -344,6 +383,7 @@ Deno.serve(async (req) => {
           console.log(`Found ${allRuns.length} total runs, ${monthlyRuns.length} this month`);
         } else {
           // Regular sync - only current month activities
+          console.log(`Regular sync for user ${profile.user_id}`);
           const startOfMonth = new Date();
           startOfMonth.setDate(1);
           startOfMonth.setHours(0, 0, 0, 0);
@@ -371,7 +411,7 @@ Deno.serve(async (req) => {
         const { currentStreak, longestStreak } = calculateStreaks(runDates);
 
         // Update profile
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from("profiles")
           .update({
             total_distance: totalDistance,
@@ -381,6 +421,10 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", profile.user_id);
+
+        if (updateError) {
+          console.error("Profile update error:", updateError);
+        }
 
         // Update monthly leaderboard
         const now = new Date();
@@ -432,9 +476,11 @@ Deno.serve(async (req) => {
           userId: profile.user_id, 
           success: true, 
           activities: totalRunsCount,
+          needsFullSync,
           newAchievements: newAchievements.length > 0 ? newAchievements : undefined,
         });
       } catch (error) {
+        console.error(`Sync error for user ${profile.user_id}:`, error);
         results.push({
           userId: profile.user_id,
           success: false,
@@ -444,22 +490,26 @@ Deno.serve(async (req) => {
     }
 
     // Update ranks after syncing
-    const { data: leaderboard } = await supabaseAdmin
-      .from("monthly_leaderboard")
-      .select("id, total_distance, rank")
-      .eq("year", new Date().getFullYear())
-      .eq("month", new Date().getMonth() + 1)
-      .order("total_distance", { ascending: false });
+    try {
+      const { data: leaderboard } = await supabaseAdmin
+        .from("monthly_leaderboard")
+        .select("id, total_distance, rank")
+        .eq("year", new Date().getFullYear())
+        .eq("month", new Date().getMonth() + 1)
+        .order("total_distance", { ascending: false });
 
-    if (leaderboard) {
-      for (let i = 0; i < leaderboard.length; i++) {
-        const newRank = i + 1;
-        const rankChange = leaderboard[i].rank ? leaderboard[i].rank! - newRank : 0;
-        await supabaseAdmin
-          .from("monthly_leaderboard")
-          .update({ rank: newRank, rank_change: rankChange })
-          .eq("id", leaderboard[i].id);
+      if (leaderboard) {
+        for (let i = 0; i < leaderboard.length; i++) {
+          const newRank = i + 1;
+          const rankChange = leaderboard[i].rank ? leaderboard[i].rank! - newRank : 0;
+          await supabaseAdmin
+            .from("monthly_leaderboard")
+            .update({ rank: newRank, rank_change: rankChange })
+            .eq("id", leaderboard[i].id);
+        }
       }
+    } catch (rankError) {
+      console.error("Rank update error:", rankError);
     }
 
     return new Response(
@@ -469,7 +519,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Sync error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Sync failed" }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Sync failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
