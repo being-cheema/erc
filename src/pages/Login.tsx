@@ -79,26 +79,6 @@ const Login = () => {
             </p>
           </motion.div>
 
-          {/* Stats preview */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="grid grid-cols-3 gap-4"
-          >
-            <div className="text-center">
-              <p className="text-3xl font-black text-foreground">650+</p>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">Runners</p>
-            </div>
-            <div className="text-center border-l border-r border-border">
-              <p className="text-3xl font-black text-primary">12K</p>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">Runs</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-black text-foreground">50K</p>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">KM</p>
-            </div>
-          </motion.div>
 
           {/* Login Button */}
           <motion.div
