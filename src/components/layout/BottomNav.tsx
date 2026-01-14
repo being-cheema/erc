@@ -14,7 +14,7 @@ const BottomNav = () => {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border safe-area-inset-bottom z-50">
+    <nav className="fixed bottom-0 left-0 right-0 glass border-t border-border/50 safe-area-inset-bottom z-50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || 
@@ -30,7 +30,7 @@ const BottomNav = () => {
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute -top-1 w-10 h-10 rounded-full bg-primary/10"
+                    className="absolute -top-1.5 w-10 h-10 rounded-xl gradient-primary opacity-15"
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
                 )}
@@ -42,7 +42,7 @@ const BottomNav = () => {
                 />
                 <span
                   className={`text-[10px] mt-1 transition-colors ${
-                    isActive ? "text-primary font-medium" : "text-muted-foreground"
+                    isActive ? "text-primary font-semibold" : "text-muted-foreground"
                   }`}
                 >
                   {item.label}

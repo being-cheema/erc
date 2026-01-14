@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.png";
 
 const StravaIcon = () => (
   <svg
@@ -37,12 +38,13 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      {/* Background gradient orbs */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
       
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 safe-area-inset-top safe-area-inset-bottom">
+      <div className="flex-1 flex flex-col justify-center items-center px-6 safe-area-inset-top safe-area-inset-bottom relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -50,14 +52,18 @@ const Login = () => {
           className="w-full max-w-sm space-y-8"
         >
           {/* Logo & Title */}
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-6">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className="w-24 h-24 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center glow-primary"
+              className="flex justify-center"
             >
-              <span className="text-4xl">🏃</span>
+              <img 
+                src={logo} 
+                alt="Erode Runners Club" 
+                className="h-32 w-auto object-contain drop-shadow-lg"
+              />
             </motion.div>
             
             <motion.div
@@ -65,8 +71,7 @@ const Login = () => {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.5 }}
             >
-              <h1 className="text-2xl font-bold text-foreground">Erode Runners Club</h1>
-              <p className="text-muted-foreground mt-2">Connect with Strava to continue</p>
+              <p className="text-muted-foreground mt-2 text-lg">Run to Live. Live to Run.</p>
             </motion.div>
           </div>
 
@@ -75,11 +80,12 @@ const Login = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
+            className="space-y-4"
           >
             <Button
               onClick={handleStravaLogin}
               disabled={isLoading}
-              className="w-full h-14 text-base font-semibold bg-[#FC4C02] hover:bg-[#e64500] text-white disabled:opacity-50"
+              className="w-full h-14 text-base font-semibold bg-strava hover:bg-strava-dark text-white disabled:opacity-50 transition-all"
             >
               {isLoading ? (
                 <motion.div
@@ -94,31 +100,29 @@ const Login = () => {
                 </>
               )}
             </Button>
-          </motion.div>
 
-          {/* Info text */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="text-center text-xs text-muted-foreground"
-          >
-            By continuing, you agree to sync your running data from Strava.
-            We only access your activity data.
-          </motion.p>
+            <p className="text-center text-xs text-muted-foreground leading-relaxed">
+              By continuing, you agree to sync your running data from Strava.
+              We only access your activity data to show your stats and rankings.
+            </p>
+          </motion.div>
         </motion.div>
       </div>
 
-      {/* Footer */}
+      {/* Footer - Strava branding compliance */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.5 }}
-        className="py-6 text-center"
+        className="py-6 text-center relative z-10"
       >
-        <p className="text-xs text-muted-foreground">
-          Powered by Strava API
-        </p>
+        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+          <span className="text-xs">Powered by</span>
+          <div className="flex items-center gap-1 text-strava">
+            <StravaIcon />
+            <span className="text-xs font-semibold">Strava</span>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

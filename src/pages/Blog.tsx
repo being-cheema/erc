@@ -18,7 +18,7 @@ const Blog = () => {
         className="px-4 pt-6 pb-4"
       >
         <h1 className="text-2xl font-bold text-foreground">Blog</h1>
-        <p className="text-muted-foreground">Tips, stories, and running wisdom</p>
+        <p className="text-muted-foreground text-sm">Tips, stories, and running wisdom</p>
       </motion.header>
 
       <div className="px-4 space-y-4">
@@ -32,8 +32,8 @@ const Blog = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-12"
           >
-            <div className="w-20 h-20 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-              <BookOpen className="w-10 h-10 text-muted-foreground" />
+            <div className="w-20 h-20 mx-auto rounded-full gradient-primary flex items-center justify-center mb-4 glow-primary">
+              <BookOpen className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-foreground mb-2">No Articles Yet</h2>
             <p className="text-muted-foreground text-sm max-w-xs mx-auto">
@@ -49,34 +49,43 @@ const Blog = () => {
               transition={{ delay: index * 0.1 }}
             >
               <Card 
-                className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+                className="cursor-pointer card-hover overflow-hidden border-border/50"
                 onClick={() => navigate(`/blog/${article.slug}`)}
               >
                 <CardContent className="p-0">
                   {article.image_url && (
-                    <div className="h-32 bg-muted">
+                    <div className="h-40 bg-muted relative">
                       <img 
                         src={article.image_url} 
                         alt={article.title}
                         className="w-full h-full object-cover"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                      <span className="absolute bottom-3 left-3 text-xs gradient-primary text-white px-2.5 py-1 rounded-full font-medium">
+                        {article.category}
+                      </span>
                     </div>
                   )}
                   <div className="p-4">
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                      {article.category}
-                    </span>
-                    <h3 className="font-semibold text-foreground mt-2">{article.title}</h3>
+                    {!article.image_url && (
+                      <span className="text-xs gradient-primary text-white px-2.5 py-1 rounded-full font-medium inline-block mb-2">
+                        {article.category}
+                      </span>
+                    )}
+                    <h3 className="font-semibold text-foreground font-sans text-lg">{article.title}</h3>
                     {article.excerpt && (
-                      <p className="text-muted-foreground text-sm mt-1 line-clamp-2">
+                      <p className="text-muted-foreground text-sm mt-2 line-clamp-2">
                         {article.excerpt}
                       </p>
                     )}
-                    <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center justify-between mt-4">
                       <span className="text-muted-foreground text-xs">
                         {format(new Date(article.created_at), "MMM d, yyyy")}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1 text-primary text-sm font-medium">
+                        <span>Read more</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
