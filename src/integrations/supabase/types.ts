@@ -507,7 +507,48 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_public: {
+        Row: {
+          avatar_url: string | null
+          city: string | null
+          created_at: string | null
+          current_streak: number | null
+          display_name: string | null
+          id: string | null
+          longest_streak: number | null
+          total_distance: number | null
+          total_runs: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string | null
+          current_streak?: number | null
+          display_name?: string | null
+          id?: string | null
+          longest_streak?: number | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string | null
+          current_streak?: number | null
+          display_name?: string | null
+          id?: string | null
+          longest_streak?: number | null
+          total_distance?: number | null
+          total_runs?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {

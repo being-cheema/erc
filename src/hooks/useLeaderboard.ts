@@ -30,10 +30,10 @@ export const useMonthlyLeaderboard = () => {
 
       if (lError) throw lError;
 
-      // Get profile info for all users
+      // Get profile info for all users using secure view
       const userIds = leaderboard?.map(l => l.user_id) || [];
       const { data: profiles } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("user_id, display_name, avatar_url")
         .in("user_id", userIds);
 
@@ -52,8 +52,9 @@ export const useAllTimeLeaderboard = () => {
   return useQuery({
     queryKey: ["leaderboard", "alltime"],
     queryFn: async () => {
+      // Use the secure view that excludes sensitive token data
       const { data, error } = await supabase
-        .from("profiles")
+        .from("profiles_public")
         .select("user_id, display_name, avatar_url, total_distance, total_runs")
         .order("total_distance", { ascending: false, nullsFirst: false })
         .limit(50);
