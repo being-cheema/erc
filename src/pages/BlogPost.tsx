@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBlogPost } from "@/hooks/useBlogPosts";
 import { useParams, useNavigate } from "react-router-dom";
@@ -22,7 +22,7 @@ const BlogPost = () => {
     return (
       <div className="min-h-screen bg-background safe-area-inset-top">
         <div className="px-4 pt-6">
-          <Button variant="ghost" onClick={() => navigate("/blog")}>
+          <Button variant="ghost" onClick={() => navigate("/blog")} className="-ml-2">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Blog
           </Button>
@@ -56,13 +56,14 @@ const BlogPost = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="h-48 bg-muted"
+          className="h-56 bg-muted relative"
         >
           <img 
             src={post.image_url} 
             alt={post.title}
             className="w-full h-full object-cover"
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
         </motion.div>
       )}
 
@@ -71,7 +72,7 @@ const BlogPost = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+          <span className="text-xs gradient-primary text-white px-2.5 py-1 rounded-full font-medium inline-block">
             {post.category}
           </span>
           
@@ -80,21 +81,21 @@ const BlogPost = () => {
           </h1>
 
           <div className="flex items-center gap-4 mt-3 text-muted-foreground text-sm">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
               <span>{format(new Date(post.created_at), "MMMM d, yyyy")}</span>
             </div>
           </div>
 
           {post.excerpt && (
-            <p className="text-muted-foreground mt-4 text-lg leading-relaxed">
+            <p className="text-muted-foreground mt-6 text-lg leading-relaxed border-l-2 border-primary pl-4">
               {post.excerpt}
             </p>
           )}
 
-          <div className="prose prose-invert max-w-none mt-6">
+          <div className="prose prose-neutral dark:prose-invert max-w-none mt-8">
             <div 
-              className="text-foreground leading-relaxed whitespace-pre-wrap"
+              className="text-foreground leading-relaxed whitespace-pre-wrap font-sans"
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
           </div>

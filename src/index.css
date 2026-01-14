@@ -4,41 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Erode Runners Club - Luxury Minimalist Dark Theme
-   A refined, premium aesthetic with subtle warmth
+/* Erode Runners Club - Premium Blue Athletic Theme
+   Inspired by club logo colors: Deep Blue & Vibrant Cyan
 */
 
 @layer base {
   :root {
-    --background: 30 10% 98%;
-    --foreground: 30 10% 10%;
+    --background: 210 20% 98%;
+    --foreground: 220 25% 12%;
 
-    --card: 30 10% 100%;
-    --card-foreground: 30 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 12%;
 
-    --popover: 30 10% 100%;
-    --popover-foreground: 30 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
 
-    --primary: 28 80% 52%;
+    --primary: 200 100% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 10% 94%;
-    --secondary-foreground: 30 10% 20%;
+    --secondary: 220 20% 94%;
+    --secondary-foreground: 220 25% 20%;
 
-    --muted: 30 10% 94%;
-    --muted-foreground: 30 10% 50%;
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 15% 45%;
 
-    --accent: 28 80% 52%;
+    --accent: 225 45% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 10% 88%;
-    --input: 30 10% 88%;
-    --ring: 28 80% 52%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 200 100% 40%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
     --success: 152 69% 31%;
     --success-foreground: 0 0% 100%;
@@ -46,50 +46,53 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
 
-    --chart-1: 28 80% 52%;
-    --chart-2: 28 60% 45%;
-    --chart-3: 28 50% 40%;
-    --chart-4: 30 10% 50%;
-    --chart-5: 30 10% 70%;
+    --strava: 16 100% 50%;
+    --strava-foreground: 0 0% 100%;
 
-    --sidebar-background: 30 10% 98%;
-    --sidebar-foreground: 30 10% 20%;
-    --sidebar-primary: 28 80% 52%;
+    --chart-1: 200 100% 40%;
+    --chart-2: 225 45% 45%;
+    --chart-3: 200 70% 50%;
+    --chart-4: 220 20% 50%;
+    --chart-5: 220 20% 70%;
+
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 220 25% 20%;
+    --sidebar-primary: 200 100% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 10% 94%;
-    --sidebar-accent-foreground: 30 10% 10%;
-    --sidebar-border: 30 10% 88%;
-    --sidebar-ring: 28 80% 52%;
+    --sidebar-accent: 220 20% 94%;
+    --sidebar-accent-foreground: 220 25% 12%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 200 100% 40%;
   }
 
   .dark {
-    --background: 20 15% 5%;
-    --foreground: 30 15% 95%;
+    --background: 225 30% 6%;
+    --foreground: 210 20% 95%;
 
-    --card: 20 15% 7%;
-    --card-foreground: 30 15% 95%;
+    --card: 225 30% 8%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 20 15% 8%;
-    --popover-foreground: 30 15% 95%;
+    --popover: 225 30% 9%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 28 75% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 195 100% 45%;
+    --primary-foreground: 225 30% 6%;
 
-    --secondary: 20 12% 12%;
-    --secondary-foreground: 30 15% 90%;
+    --secondary: 225 25% 12%;
+    --secondary-foreground: 210 20% 90%;
 
-    --muted: 20 12% 14%;
-    --muted-foreground: 30 10% 55%;
+    --muted: 225 25% 14%;
+    --muted-foreground: 220 15% 55%;
 
-    --accent: 28 75% 55%;
+    --accent: 220 50% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 20 12% 16%;
-    --input: 20 12% 16%;
-    --ring: 28 75% 55%;
+    --border: 225 25% 15%;
+    --input: 225 25% 15%;
+    --ring: 195 100% 45%;
 
     --success: 152 69% 40%;
     --success-foreground: 0 0% 100%;
@@ -97,20 +100,23 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
 
-    --chart-1: 28 75% 55%;
-    --chart-2: 28 60% 50%;
-    --chart-3: 28 50% 45%;
-    --chart-4: 20 12% 40%;
-    --chart-5: 20 12% 60%;
+    --strava: 16 100% 50%;
+    --strava-foreground: 0 0% 100%;
 
-    --sidebar-background: 20 15% 6%;
-    --sidebar-foreground: 30 15% 85%;
-    --sidebar-primary: 28 75% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 20 12% 12%;
-    --sidebar-accent-foreground: 30 15% 95%;
-    --sidebar-border: 20 12% 16%;
-    --sidebar-ring: 28 75% 55%;
+    --chart-1: 195 100% 45%;
+    --chart-2: 220 50% 55%;
+    --chart-3: 200 80% 50%;
+    --chart-4: 225 25% 40%;
+    --chart-5: 225 25% 60%;
+
+    --sidebar-background: 225 30% 7%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 195 100% 45%;
+    --sidebar-primary-foreground: 225 30% 6%;
+    --sidebar-accent: 225 25% 12%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 225 25% 15%;
+    --sidebar-ring: 195 100% 45%;
   }
 }
 
@@ -128,7 +134,7 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', Georgia, serif;
     letter-spacing: -0.02em;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   /* Mobile-first approach */
@@ -147,7 +153,7 @@
   }
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar */
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -158,39 +164,52 @@
     display: none;
   }
 
+  /* Primary gradient - Cyan to Deep Blue */
   .gradient-primary {
-    background: linear-gradient(145deg, hsl(28 75% 55%) 0%, hsl(28 85% 45%) 100%);
+    background: linear-gradient(135deg, hsl(195 100% 45%) 0%, hsl(220 50% 45%) 100%);
   }
 
+  /* Subtle background gradient */
   .gradient-subtle {
-    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(20 15% 4%) 100%);
+    background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(225 30% 5%) 100%);
   }
 
+  /* Premium gold accent */
   .gradient-gold {
-    background: linear-gradient(135deg, hsl(38 70% 50%) 0%, hsl(28 75% 55%) 50%, hsl(18 80% 50%) 100%);
+    background: linear-gradient(135deg, hsl(45 90% 55%) 0%, hsl(38 85% 50%) 50%, hsl(30 80% 45%) 100%);
   }
 
+  /* Text gradient */
   .text-gradient {
-    background: linear-gradient(135deg, hsl(38 70% 55%) 0%, hsl(28 75% 55%) 100%);
+    background: linear-gradient(135deg, hsl(195 100% 50%) 0%, hsl(220 50% 55%) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
+  /* Primary glow effect */
   .glow-primary {
-    box-shadow: 0 0 40px hsl(28 75% 55% / 0.15);
+    box-shadow: 0 0 40px hsl(195 100% 45% / 0.2);
   }
 
+  /* Gold glow effect */
   .glow-gold {
-    box-shadow: 0 0 60px hsl(38 70% 50% / 0.12);
+    box-shadow: 0 0 60px hsl(45 90% 55% / 0.15);
   }
 
+  /* Accent glow */
+  .glow-accent {
+    box-shadow: 0 0 30px hsl(220 50% 55% / 0.2);
+  }
+
+  /* Glassmorphism */
   .glass {
-    background: hsl(var(--card) / 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: hsl(var(--card) / 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
+  /* Premium shadows */
   .luxury-shadow {
     box-shadow: 
       0 4px 6px -1px hsl(0 0% 0% / 0.1),
@@ -200,9 +219,21 @@
 
   .luxury-shadow-lg {
     box-shadow: 
-      0 20px 25px -5px hsl(0 0% 0% / 0.15),
-      0 8px 10px -6px hsl(0 0% 0% / 0.1),
+      0 25px 50px -12px hsl(0 0% 0% / 0.25),
       0 0 0 1px hsl(var(--border) / 0.3);
+  }
+
+  /* Strava brand color */
+  .bg-strava {
+    background-color: hsl(16 100% 50%);
+  }
+
+  .text-strava {
+    color: hsl(16 100% 50%);
+  }
+
+  .hover\:bg-strava-dark:hover {
+    background-color: hsl(16 100% 45%);
   }
 }
 
@@ -223,19 +254,41 @@
   animation: shimmer 2s ease-in-out infinite;
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* Refined card hover states */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card-hover:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: 
-    0 20px 25px -5px hsl(0 0% 0% / 0.15),
-    0 8px 10px -6px hsl(0 0% 0% / 0.1);
+    0 25px 50px -12px hsl(0 0% 0% / 0.2),
+    0 0 0 1px hsl(var(--border) / 0.3);
 }
 
 /* Subtle border glow on focus */
 .focus-glow:focus-within {
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+
+/* Podium colors */
+.podium-gold {
+  background: linear-gradient(135deg, hsl(45 90% 55%) 0%, hsl(38 85% 45%) 100%);
+}
+
+.podium-silver {
+  background: linear-gradient(135deg, hsl(220 10% 70%) 0%, hsl(220 10% 55%) 100%);
+}
+
+.podium-bronze {
+  background: linear-gradient(135deg, hsl(25 70% 50%) 0%, hsl(20 65% 40%) 100%);
 }

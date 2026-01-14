@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Timer, Users, Trophy, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingSlide from "./OnboardingSlide";
+import logo from "@/assets/logo.png";
 
 const slides = [
   {
@@ -44,15 +45,19 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
   const isLastSlide = currentSlide === slides.length - 1;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
+    <div className="flex flex-col h-full bg-background">
+      {/* Header with Logo */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="pt-safe-top px-6 pt-8 pb-4"
+        className="pt-safe-top px-6 pt-8 pb-4 flex flex-col items-center"
       >
-        <h1 className="text-xl font-bold text-gradient">Erode Runners Club</h1>
+        <img 
+          src={logo} 
+          alt="Erode Runners Club" 
+          className="h-20 w-auto object-contain"
+        />
       </motion.div>
 
       {/* Slides Container */}
@@ -86,7 +91,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
               onClick={() => goToSlide(index)}
               className={`h-2 rounded-full transition-all duration-300 ${
                 index === currentSlide
-                  ? "w-8 bg-primary"
+                  ? "w-8 gradient-primary"
                   : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
               }`}
             />
@@ -97,7 +102,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
         <div className="space-y-3">
           <Button
             onClick={nextSlide}
-            className="w-full h-14 text-base font-semibold gradient-primary hover:opacity-90 transition-opacity"
+            className="w-full h-14 text-base font-semibold gradient-primary border-0 text-white hover:opacity-90 transition-opacity"
           >
             {isLastSlide ? (
               "Get Started"

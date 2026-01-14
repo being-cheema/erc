@@ -59,6 +59,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        strava: {
+          DEFAULT: "hsl(var(--strava))",
+          foreground: "hsl(var(--strava-foreground))",
+        },
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",
@@ -84,7 +88,7 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Playfair Display', 'Georgia', 'serif'],
       },
       keyframes: {
         "accordion-down": {
@@ -111,6 +115,10 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -119,6 +127,7 @@ export default {
         "slide-up": "slide-up 0.5s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "float": "float 3s ease-in-out infinite",
       },
       spacing: {
         'safe-top': 'env(safe-area-inset-top)',

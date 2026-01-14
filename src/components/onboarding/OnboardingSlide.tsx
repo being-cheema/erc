@@ -25,7 +25,7 @@ const OnboardingSlide = ({ icon: Icon, title, description, isActive }: Onboardin
         transition={{ delay: 0.2, duration: 0.5 }}
         className="relative mb-8"
       >
-        <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center glow-primary">
+        <div className="w-32 h-32 rounded-full gradient-primary flex items-center justify-center glow-primary">
           <motion.div
             animate={{ 
               y: [0, -5, 0],
@@ -36,14 +36,14 @@ const OnboardingSlide = ({ icon: Icon, title, description, isActive }: Onboardin
               ease: "easeInOut" 
             }}
           >
-            <Icon className="w-16 h-16 text-primary" strokeWidth={1.5} />
+            <Icon className="w-16 h-16 text-white" strokeWidth={1.5} />
           </motion.div>
         </div>
         <motion.div
-          className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-2 bg-primary/20 rounded-full blur-sm"
+          className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-3 bg-primary/20 rounded-full blur-md"
           animate={{ 
             scaleX: [1, 1.2, 1],
-            opacity: [0.5, 0.8, 0.5]
+            opacity: [0.4, 0.7, 0.4]
           }}
           transition={{ 
             duration: 2, 

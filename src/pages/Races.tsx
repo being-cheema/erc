@@ -43,7 +43,7 @@ const Races = () => {
         className="px-4 pt-6 pb-4"
       >
         <h1 className="text-2xl font-bold text-foreground">Races</h1>
-        <p className="text-muted-foreground">Upcoming club events and races</p>
+        <p className="text-muted-foreground text-sm">Upcoming club events and races</p>
       </motion.header>
 
       <div className="px-4 space-y-4">
@@ -57,8 +57,8 @@ const Races = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-12"
           >
-            <div className="w-20 h-20 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-              <Calendar className="w-10 h-10 text-muted-foreground" />
+            <div className="w-20 h-20 mx-auto rounded-full gradient-primary flex items-center justify-center mb-4 glow-primary">
+              <Calendar className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-foreground mb-2">No Upcoming Races</h2>
             <p className="text-muted-foreground text-sm max-w-xs mx-auto">
@@ -75,32 +75,33 @@ const Races = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="overflow-hidden">
+                <Card className="overflow-hidden border-border/50 card-hover">
                   {race.image_url && (
-                    <div className="h-32 bg-muted">
+                    <div className="h-36 bg-muted relative">
                       <img 
                         src={race.image_url} 
                         alt={race.name}
                         className="w-full h-full object-cover"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     </div>
                   )}
                   <CardContent className="p-4">
                     <div className="flex gap-4">
-                      <div className="w-14 h-14 rounded-xl bg-primary/10 flex flex-col items-center justify-center shrink-0">
-                        <span className="text-xs text-primary font-medium">{date.month}</span>
-                        <span className="text-lg font-bold text-primary">{date.day}</span>
+                      <div className="w-14 h-14 rounded-xl gradient-primary flex flex-col items-center justify-center shrink-0">
+                        <span className="text-xs text-white/90 font-medium">{date.month}</span>
+                        <span className="text-lg font-bold text-white">{date.day}</span>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{race.name}</h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground font-sans">{race.name}</h3>
                         {race.location && (
                           <div className="flex items-center gap-2 mt-1">
-                            <MapPin className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-muted-foreground text-sm">{race.location}</span>
+                            <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <span className="text-muted-foreground text-sm truncate">{race.location}</span>
                           </div>
                         )}
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className="text-xs gradient-primary text-white px-2.5 py-1 rounded-full font-medium">
                             {race.distance_type}
                           </span>
                           <div className="flex items-center gap-1 text-muted-foreground text-xs">
@@ -118,7 +119,7 @@ const Races = () => {
                     <div className="flex gap-2 mt-4">
                       <Button
                         variant={race.is_registered ? "secondary" : "default"}
-                        className="flex-1"
+                        className={`flex-1 ${!race.is_registered ? "gradient-primary border-0 text-white hover:opacity-90" : ""}`}
                         onClick={() => handleRegister(race.id, race.is_registered || false)}
                         disabled={registerMutation.isPending || unregisterMutation.isPending}
                       >
@@ -134,7 +135,9 @@ const Races = () => {
                       {race.registration_url && (
                         <Button
                           variant="outline"
+                          size="icon"
                           onClick={() => window.open(race.registration_url!, "_blank")}
+                          className="shrink-0"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </Button>
