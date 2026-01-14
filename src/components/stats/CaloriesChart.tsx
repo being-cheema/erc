@@ -5,10 +5,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Flame } from "lucide-react";
 import { format } from "date-fns";
 
-const CaloriesChart = () => {
+interface CaloriesChartProps {
+  compact?: boolean;
+}
+
+const CaloriesChart = ({ compact = false }: CaloriesChartProps) => {
   const { data: activities, isLoading } = useRecentActivities();
 
   if (isLoading) {
+    if (compact) {
+      return <Skeleton className="h-32 w-full rounded-lg" />;
+    }
     return (
       <Card className="border-border/50">
         <CardHeader className="pb-2">
@@ -44,6 +51,75 @@ const CaloriesChart = () => {
     ? caloriesData[caloriesData.length - 1].cumulative
     : 0;
 
+  const chartHeight = compact ? 120 : 192;
+  const gradientId = compact ? "caloriesGradientCompact" : "caloriesGradient";
+
+  const chartContent = hasData ? (
+    <div style={{ height: chartHeight }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={caloriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(1)}k` : value}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              fontSize: "13px",
+            }}
+            formatter={(value: number, name: string) => [
+              `${value.toLocaleString()} kcal`,
+              name === "cumulative" ? "Total" : "This Run",
+            ]}
+          />
+          <Area
+            type="monotone"
+            dataKey="cumulative"
+            stroke="hsl(var(--warning))"
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  ) : (
+    <div style={{ height: chartHeight }} className="flex flex-col items-center justify-center">
+      <Flame className="w-6 h-6 text-muted-foreground mb-2" />
+      <p className="text-muted-foreground text-sm">No calorie data yet</p>
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className="bg-accent/30 rounded-lg p-3">
+        {hasData && (
+          <div className="flex justify-end mb-1">
+            <span className="text-xs text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{totalCalories.toLocaleString()} kcal</span>
+            </span>
+          </div>
+        )}
+        {chartContent}
+      </div>
+    );
+  }
+
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-2">
@@ -60,59 +136,7 @@ const CaloriesChart = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {hasData ? (
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={caloriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="caloriesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(1)}k` : value}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "13px",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    `${value.toLocaleString()} kcal`,
-                    name === "cumulative" ? "Total" : "This Run",
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="cumulative"
-                  stroke="hsl(var(--warning))"
-                  strokeWidth={2}
-                  fill="url(#caloriesGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="h-48 flex flex-col items-center justify-center">
-            <Flame className="w-8 h-8 text-muted-foreground mb-2" />
-            <p className="text-muted-foreground text-sm">No calorie data yet</p>
-            <p className="text-muted-foreground text-xs mt-1">
-              Start running to burn calories!
-            </p>
-          </div>
-        )}
+        {chartContent}
       </CardContent>
     </Card>
   );

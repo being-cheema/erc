@@ -56,7 +56,7 @@ export function useActivities(limit?: number) {
 }
 
 export function useRecentActivities() {
-  return useActivities(5);
+  return useActivities(15);
 }
 
 export function useMonthlyActivities() {
