@@ -1,39 +1,24 @@
 import { motion } from "framer-motion";
-import { Target, Clock, ChevronRight } from "lucide-react";
+import { Target, Clock, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-
-const trainingPlans = [
-  {
-    id: "5k-beginner",
-    name: "5K Beginner",
-    duration: "8 weeks",
-    level: "Beginner",
-    description: "Perfect for new runners looking to complete their first 5K",
-  },
-  {
-    id: "10k-intermediate",
-    name: "10K Intermediate",
-    duration: "10 weeks",
-    level: "Intermediate",
-    description: "Build endurance and speed for your 10K goal",
-  },
-  {
-    id: "half-marathon",
-    name: "Half Marathon",
-    duration: "12 weeks",
-    level: "Intermediate",
-    description: "Prepare for the 21.1km challenge with structured training",
-  },
-  {
-    id: "marathon",
-    name: "Marathon",
-    duration: "16 weeks",
-    level: "Advanced",
-    description: "Complete 42.2km marathon preparation program",
-  },
-];
+import { useTrainingPlans } from "@/hooks/useTrainingPlans";
 
 const Training = () => {
+  const { data: plans, isLoading } = useTrainingPlans();
+
+  const getLevelStyle = (level: string) => {
+    switch (level.toLowerCase()) {
+      case "beginner":
+        return "bg-success/10 text-success";
+      case "intermediate":
+        return "bg-warning/10 text-warning";
+      case "advanced":
+        return "bg-destructive/10 text-destructive";
+      default:
+        return "bg-primary/10 text-primary";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background safe-area-inset-top pb-24">
       {/* Header */}
@@ -47,44 +32,65 @@ const Training = () => {
       </motion.header>
 
       <div className="px-4 space-y-4">
-        {trainingPlans.map((plan, index) => (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : !plans || plans.length === 0 ? (
           <motion.div
-            key={plan.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            className="text-center py-12"
           >
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Target className="w-6 h-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground">{plan.name}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        plan.level === "Beginner" 
-                          ? "bg-success/10 text-success" 
-                          : plan.level === "Intermediate"
-                            ? "bg-warning/10 text-warning"
-                            : "bg-destructive/10 text-destructive"
-                      }`}>
-                        {plan.level}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground text-sm mb-2">{plan.description}</p>
-                    <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                      <Clock className="w-3 h-3" />
-                      <span>{plan.duration}</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground self-center" />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="w-20 h-20 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+              <Target className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground mb-2">No Training Plans</h2>
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              Training plans coming soon. Check back later!
+            </p>
           </motion.div>
-        ))}
+        ) : (
+          plans.map((plan, index) => (
+            <motion.div
+              key={plan.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Target className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">{plan.name}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getLevelStyle(plan.level)}`}>
+                          {plan.level}
+                        </span>
+                      </div>
+                      {plan.description && (
+                        <p className="text-muted-foreground text-sm mb-2">{plan.description}</p>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                          <Clock className="w-3 h-3" />
+                          <span>{plan.duration_weeks} weeks</span>
+                        </div>
+                        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                          {plan.goal_distance}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground self-center" />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))
+        )}
 
         {/* Coming Soon Note */}
         <motion.div

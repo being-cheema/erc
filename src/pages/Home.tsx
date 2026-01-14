@@ -1,23 +1,40 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, TrendingUp, Trophy, Zap } from "lucide-react";
+import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useProfile, useCurrentUser } from "@/hooks/useProfile";
+import { useRaces } from "@/hooks/useRaces";
+import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { format } from "date-fns";
 
 const Home = () => {
   const navigate = useNavigate();
-  
-  // Placeholder data - will be replaced with real Strava data
-  const userData = {
-    name: "Runner",
-    monthlyDistance: 0,
-    monthlyRuns: 0,
-    currentRank: "-",
-    nextRace: null,
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: user } = useCurrentUser();
+  const { data: races } = useRaces();
+
+  const upcomingRace = races?.[0];
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  const monthlyDistance = profile?.total_distance || 0;
+  const monthlyRuns = profile?.total_runs || 0;
+  const currentStreak = profile?.current_streak || 0;
+
   return (
-    <div className="min-h-screen bg-background safe-area-inset-top">
+    <div className="min-h-screen bg-background safe-area-inset-top pb-24">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -26,12 +43,27 @@ const Home = () => {
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-muted-foreground text-sm">Good morning,</p>
-            <h1 className="text-2xl font-bold text-foreground">{userData.name} 👋</h1>
+            <p className="text-muted-foreground text-sm">{getGreeting()},</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {profile?.display_name || "Runner"} 👋
+            </h1>
           </div>
-          <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 bg-muted">
-            <span className="text-lg">🏃</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback>
+                {profile?.display_name?.[0]?.toUpperCase() || "R"}
+              </AvatarFallback>
+            </Avatar>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout}
+              className="rounded-full"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </motion.header>
 
@@ -50,10 +82,14 @@ const Home = () => {
                   <TrendingUp className="w-5 h-5 text-white/70" />
                 </div>
                 <div className="flex items-end gap-1">
-                  <span className="text-4xl font-bold text-white">{userData.monthlyDistance}</span>
+                  <span className="text-4xl font-bold text-white">
+                    {(Number(monthlyDistance) / 1000).toFixed(1)}
+                  </span>
                   <span className="text-white/70 mb-1">km</span>
                 </div>
-                <p className="text-white/70 text-sm mt-1">{userData.monthlyRuns} runs completed</p>
+                <p className="text-white/70 text-sm mt-1">
+                  {monthlyRuns} runs completed
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -77,7 +113,7 @@ const Home = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Your Rank</p>
-                  <p className="text-xl font-bold text-foreground">{userData.currentRank}</p>
+                  <p className="text-xl font-bold text-foreground">-</p>
                 </div>
               </div>
             </CardContent>
@@ -94,7 +130,9 @@ const Home = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Streak</p>
-                  <p className="text-xl font-bold text-foreground">0 days</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {currentStreak} days
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -118,9 +156,14 @@ const Home = () => {
                     <Calendar className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground">Upcoming Races</h3>
+                    <h3 className="font-semibold text-foreground">
+                      {upcomingRace ? upcomingRace.name : "Upcoming Races"}
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      {userData.nextRace ? "Next race in 5 days" : "No upcoming races"}
+                      {upcomingRace 
+                        ? format(new Date(upcomingRace.race_date), "MMM d, yyyy")
+                        : "No upcoming races"
+                      }
                     </p>
                   </div>
                 </div>
@@ -156,27 +199,30 @@ const Home = () => {
           </div>
         </motion.div>
 
-        {/* Connect Strava CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#FC4C02]/10 flex items-center justify-center shrink-0">
-                  <span className="text-2xl">🔗</span>
+        {/* Strava Connected Status */}
+        {profile?.strava_id && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="border-success/30 bg-success/5">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-[#FC4C02]/10 flex items-center justify-center shrink-0">
+                    <span className="text-2xl">✓</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Strava Connected</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Your activities are synced
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Connect Strava</h3>
-                  <p className="text-muted-foreground text-sm">Sync your activities to see your stats</p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );
