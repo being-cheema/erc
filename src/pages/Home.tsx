@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Activity } from "lucide-react";
+import { ChevronRight, Calendar, TrendingUp, Trophy, Zap, LogOut, Activity, Settings } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -9,12 +9,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import logo from "@/assets/logo.png";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefresh from "@/components/PullToRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Home = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: user } = useCurrentUser();
   const { data: races } = useRaces();
+
+  const {
+    isRefreshing,
+    pullDistance,
+    threshold,
+    containerRef,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+  } = usePullToRefresh(() => {
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["monthlyLeaderboard"] });
+    queryClient.invalidateQueries({ queryKey: ["allTimeLeaderboard"] });
+  });
 
   const upcomingRace = races?.[0];
 
@@ -35,12 +53,25 @@ const Home = () => {
   const currentStreak = profile?.current_streak || 0;
 
   return (
-    <div className="min-h-screen bg-background safe-area-inset-top pb-24">
+    <div 
+      ref={containerRef}
+      className="min-h-screen bg-background safe-area-inset-top pb-24 overflow-y-auto relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <PullToRefresh 
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        threshold={threshold}
+      />
+      
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="px-4 pt-6 pb-4"
+        style={{ transform: `translateY(${pullDistance * 0.3}px)` }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -53,7 +84,18 @@ const Home = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Avatar className="w-10 h-10 border-2 border-primary/20">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate("/settings")}
+              className="rounded-full text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Avatar 
+              className="w-10 h-10 border-2 border-primary/20 cursor-pointer"
+              onClick={() => navigate("/settings")}
+            >
               <AvatarImage src={profile?.avatar_url || undefined} />
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                 {profile?.display_name?.[0]?.toUpperCase() || "R"}

@@ -5,11 +5,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMonthlyLeaderboard, useAllTimeLeaderboard, LeaderboardEntry } from "@/hooks/useLeaderboard";
 import { useCurrentUser } from "@/hooks/useProfile";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefresh from "@/components/PullToRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Leaderboard = () => {
+  const queryClient = useQueryClient();
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyLeaderboard();
   const { data: allTimeData, isLoading: allTimeLoading } = useAllTimeLeaderboard();
   const { data: currentUser } = useCurrentUser();
+
+  const {
+    isRefreshing,
+    pullDistance,
+    threshold,
+    containerRef,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+  } = usePullToRefresh(() => {
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["monthlyLeaderboard"] });
+    queryClient.invalidateQueries({ queryKey: ["allTimeLeaderboard"] });
+  });
 
   const getRankChange = (change: number | null) => {
     if (!change) return { icon: Minus, color: "text-muted-foreground", text: "—" };
@@ -171,15 +189,28 @@ const Leaderboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background safe-area-inset-top pb-24">
+    <div 
+      ref={containerRef}
+      className="min-h-screen bg-background safe-area-inset-top pb-24 overflow-y-auto relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <PullToRefresh 
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        threshold={threshold}
+      />
+      
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="px-4 pt-6 pb-4"
+        style={{ transform: `translateY(${pullDistance * 0.3}px)` }}
       >
         <h1 className="text-2xl font-bold text-foreground">Leaderboard</h1>
-        <p className="text-muted-foreground text-sm">Club rankings by distance</p>
+        <p className="text-muted-foreground text-sm">Club rankings by distance • Pull to sync</p>
       </motion.header>
 
       <div className="px-4">
