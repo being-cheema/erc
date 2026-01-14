@@ -1,33 +1,21 @@
 import { motion } from "framer-motion";
 import { TrendingUp, Footprints, Zap, Award, Timer, Flame, Heart, Mountain } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useProfile } from "@/hooks/useProfile";
-import { useRecentActivities, formatPace } from "@/hooks/useActivities";
+import { useAllTimeStats } from "@/hooks/useAllTimeStats";
+import { formatPace } from "@/hooks/useActivities";
 import MonthComparison from "./MonthComparison";
 
 const OverviewTab = () => {
-  const { data: profile } = useProfile();
-  const { data: activities } = useRecentActivities();
+  const { data: stats } = useAllTimeStats();
 
-  const totalDistance = profile?.total_distance || 0;
-  const totalRuns = profile?.total_runs || 0;
-  const currentStreak = profile?.current_streak || 0;
-  const longestStreak = profile?.longest_streak || 0;
-
-  // Calculate averages from recent activities
-  const activitiesWithPace = activities?.filter(a => a.average_pace) || [];
-  const avgPace = activitiesWithPace.length > 0
-    ? activitiesWithPace.reduce((sum, a) => sum + (a.average_pace || 0), 0) / activitiesWithPace.length
-    : null;
-
-  const activitiesWithHR = activities?.filter(a => a.average_heartrate) || [];
-  const avgHeartRate = activitiesWithHR.length > 0
-    ? Math.round(activitiesWithHR.reduce((sum, a) => sum + (a.average_heartrate || 0), 0) / activitiesWithHR.length)
-    : null;
-
-  // Calculate total elevation and calories from activities
-  const totalElevation = activities?.reduce((sum, a) => sum + (a.elevation_gain || 0), 0) || 0;
-  const totalCalories = activities?.reduce((sum, a) => sum + (a.calories || 0), 0) || 0;
+  const totalDistance = stats?.totalDistance || 0;
+  const totalRuns = stats?.totalRuns || 0;
+  const currentStreak = stats?.currentStreak || 0;
+  const longestStreak = stats?.longestStreak || 0;
+  const avgPace = stats?.avgPace || null;
+  const avgHeartRate = stats?.avgHeartRate || null;
+  const totalElevation = stats?.totalElevation || 0;
+  const totalCalories = stats?.totalCalories || 0;
 
   const statCards = [
     {
