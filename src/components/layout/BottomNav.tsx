@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Calendar, BarChart3, Trophy, BookOpen } from "lucide-react";
+import { Home, Calendar, BarChart3, Trophy, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 
 const navItems = [
@@ -7,7 +7,7 @@ const navItems = [
   { path: "/races", icon: Calendar, label: "Races" },
   { path: "/stats", icon: BarChart3, label: "Stats" },
   { path: "/leaderboard", icon: Trophy, label: "Ranks" },
-  { path: "/blog", icon: BookOpen, label: "Blog" },
+  { path: "/settings", icon: Settings, label: "Settings" },
 ];
 
 const BottomNav = () => {
