@@ -613,48 +613,63 @@ Deno.serve(async (req) => {
           totalElevation += detail.total_elevation_gain || 0;
         });
 
-        // Store individual activities in activities table with detailed data
+        // Store activities in batches for efficiency
         try {
-          for (const run of newActivitiesToStore) {
+          const weight = athlete?.weight || 70; // Default 70kg if not available
+          
+          // Helper to safely convert to integer
+          const toInt = (val: number | undefined | null): number | null => {
+            if (val === undefined || val === null) return null;
+            return Math.round(val);
+          };
+          
+          // Prepare all activities for batch upsert
+          const activitiesToUpsert = newActivitiesToStore.map(run => {
             const detail = activityDetails.get(run.id);
-            
-            // Calculate average pace (seconds per km)
             const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
-            
-            // Use athlete weight for calorie calculation if available, else estimate
-            const weight = athlete?.weight || 70; // Default 70kg if not available
             const estimatedCalories = detail?.calories || Math.round((run.distance / 1000) * weight * 0.9);
             
-            // Upsert activity with all available data
-            await supabaseAdmin
+            return {
+              user_id: profile.user_id,
+              strava_id: run.id,
+              name: run.name,
+              distance: run.distance,
+              moving_time: toInt(run.moving_time),
+              elapsed_time: toInt(run.elapsed_time || detail?.elapsed_time),
+              start_date: run.start_date,
+              average_pace: avgPace,
+              average_speed: detail?.average_speed || run.average_speed,
+              max_speed: detail?.max_speed || run.max_speed,
+              activity_type: run.type,
+              calories: toInt(estimatedCalories),
+              elevation_gain: detail?.total_elevation_gain || run.total_elevation_gain || 0,
+              average_heartrate: toInt(detail?.average_heartrate || run.average_heartrate),
+              max_heartrate: toInt(detail?.max_heartrate || run.max_heartrate),
+              suffer_score: toInt(detail?.suffer_score || run.suffer_score),
+              kudos_count: toInt(detail?.kudos_count || run.kudos_count || 0),
+              achievement_count: toInt(detail?.achievement_count || run.achievement_count || 0),
+              description: detail?.description,
+              workout_type: toInt(detail?.workout_type),
+              gear_id: detail?.gear_id,
+            };
+          });
+          
+          // Batch upsert in chunks of 100 to avoid payload limits
+          const batchSize = 100;
+          for (let i = 0; i < activitiesToUpsert.length; i += batchSize) {
+            const batch = activitiesToUpsert.slice(i, i + batchSize);
+            const { error: batchError } = await supabaseAdmin
               .from("activities")
-              .upsert({
-                user_id: profile.user_id,
-                strava_id: run.id,
-                name: run.name,
-                distance: run.distance,
-                moving_time: run.moving_time,
-                elapsed_time: run.elapsed_time || detail?.elapsed_time,
-                start_date: run.start_date,
-                average_pace: avgPace,
-                average_speed: detail?.average_speed || run.average_speed,
-                max_speed: detail?.max_speed || run.max_speed,
-                activity_type: run.type,
-                calories: estimatedCalories,
-                elevation_gain: detail?.total_elevation_gain || run.total_elevation_gain || 0,
-                average_heartrate: detail?.average_heartrate || run.average_heartrate,
-                max_heartrate: detail?.max_heartrate || run.max_heartrate,
-                suffer_score: detail?.suffer_score || run.suffer_score,
-                kudos_count: detail?.kudos_count || run.kudos_count || 0,
-                achievement_count: detail?.achievement_count || run.achievement_count || 0,
-                description: detail?.description,
-                workout_type: detail?.workout_type,
-                gear_id: detail?.gear_id,
-              }, {
-                onConflict: 'strava_id',
-              });
+              .upsert(batch, { onConflict: 'strava_id' });
+            
+            if (batchError) {
+              console.error(`Error upserting batch ${i / batchSize + 1}:`, batchError);
+            } else {
+              console.log(`Upserted batch ${i / batchSize + 1}: ${batch.length} activities`);
+            }
           }
-          console.log(`Stored ${newActivitiesToStore.length} activities with detailed data for user ${profile.user_id}`);
+          
+          console.log(`Stored ${activitiesToUpsert.length} activities with detailed data for user ${profile.user_id}`);
         } catch (activityError) {
           console.error("Error storing activities:", activityError);
           // Don't fail the sync if activity storage fails
