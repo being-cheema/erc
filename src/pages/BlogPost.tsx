@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useBlogPost } from "@/hooks/useBlogPosts";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import DOMPurify from "dompurify";
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -96,7 +97,13 @@ const BlogPost = () => {
           <div className="prose prose-neutral dark:prose-invert max-w-none mt-8">
             <div 
               className="text-foreground leading-relaxed whitespace-pre-wrap font-sans"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ 
+                __html: DOMPurify.sanitize(post.content, {
+                  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'span', 'div'],
+                  ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+                  ALLOW_DATA_ATTR: false,
+                })
+              }}
             />
           </div>
         </motion.div>
