@@ -153,7 +153,8 @@ const Settings = () => {
   };
 
   const handleForceSync = async () => {
-    if (!profile?.strava_access_token) {
+    // SECURITY: Check strava_id (safe to expose) instead of strava_access_token
+    if (!profile?.strava_id) {
       toast.error("No Strava connection found");
       return;
     }
