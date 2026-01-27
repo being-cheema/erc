@@ -766,11 +766,13 @@ Deno.serve(async (req) => {
           newAchievements: newAchievements.length > 0 ? newAchievements : undefined,
         });
       } catch (error) {
+        // Log detailed error server-side for debugging
         console.error(`Sync error for user ${profile.user_id}:`, error);
+        // Return generic error message to client to prevent information leakage
         results.push({
           userId: profile.user_id,
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: "sync_failed",
         });
       }
     }
@@ -803,9 +805,11 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    // Log detailed error server-side for debugging
     console.error("Sync error:", error);
+    // Return generic error message to client to prevent information leakage
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Sync failed" }),
+      JSON.stringify({ success: false, error: "sync_failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
