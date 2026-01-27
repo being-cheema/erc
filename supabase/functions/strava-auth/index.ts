@@ -1,9 +1,38 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS - restrict to known domains
+const ALLOWED_ORIGINS = [
+  "https://id-preview--7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
+  "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
+  // Add production domain here when deployed
+];
+
+// Add localhost for development if needed
+if (Deno.env.get("ENVIRONMENT") === "development") {
+  ALLOWED_ORIGINS.push("http://localhost:5173", "http://localhost:3000");
+}
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+// Allowed redirect URIs for OAuth - prevents open redirect attacks
+const ALLOWED_REDIRECT_URIS = [
+  "https://id-preview--7b78d716-a91e-4441-86b0-b30684e91214.lovable.app/strava-callback",
+  "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app/strava-callback",
+  // Add production domain here when deployed
+];
+
+if (Deno.env.get("ENVIRONMENT") === "development") {
+  ALLOWED_REDIRECT_URIS.push(
+    "http://localhost:5173/strava-callback",
+    "http://localhost:3000/strava-callback"
+  );
+}
 
 const STRAVA_CLIENT_ID = Deno.env.get("STRAVA_CLIENT_ID")!;
 const STRAVA_CLIENT_SECRET = Deno.env.get("STRAVA_CLIENT_SECRET")!;
@@ -11,6 +40,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -25,6 +57,15 @@ Deno.serve(async (req) => {
       if (!redirectUri) {
         return new Response(
           JSON.stringify({ error: "redirect_uri is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate redirect_uri against allowed list to prevent open redirect attacks
+      if (!ALLOWED_REDIRECT_URIS.includes(redirectUri)) {
+        console.error("Invalid redirect_uri attempted:", redirectUri);
+        return new Response(
+          JSON.stringify({ error: "Invalid redirect_uri" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
