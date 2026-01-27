@@ -1,9 +1,24 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// SECURITY: Explicit origin allowlist to prevent CORS attacks
+const ALLOWED_ORIGINS = [
+  "https://id-preview--7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
+  "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
+  // Add production domain when deployed
+];
+
+// Add development origins
+if (Deno.env.get("ENVIRONMENT") === "development") {
+  ALLOWED_ORIGINS.push("http://localhost:5173", "http://localhost:3000");
+}
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 interface StravaActivity {
   id: number;
