@@ -372,6 +372,24 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // SECURITY: Always validate the Authorization token first
+    const authHeader = req.headers.get("Authorization");
+    let authenticatedUserId: string | null = null;
+    let isAdmin = false;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && data?.user) {
+        authenticatedUserId = data.user.id;
+        
+        // Check if user is admin for cross-user sync capability
+        const { data: adminCheck } = await supabaseAdmin
+          .rpc('has_role', { _user_id: authenticatedUserId, _role: 'admin' });
+        isAdmin = adminCheck === true;
+      }
+    }
+
     // Parse request body for options
     let forceFullSync = false;
     let targetUserId: string | null = null;
@@ -386,17 +404,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check for authorization
-    const authHeader = req.headers.get("Authorization");
-    let userId: string | null = targetUserId;
-
-    if (!userId && authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user) {
-        userId = data.user.id;
+    // SECURITY: Verify authorization for cross-user sync
+    // Only admins can sync other users' data
+    if (targetUserId && authenticatedUserId && targetUserId !== authenticatedUserId) {
+      if (!isAdmin) {
+        console.warn(`Unauthorized cross-user sync attempt: ${authenticatedUserId} tried to sync ${targetUserId}`);
+        return new Response(
+          JSON.stringify({ success: false, error: "forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+      console.log(`Admin ${authenticatedUserId} syncing user ${targetUserId}`);
     }
+
+    // Determine final user ID to sync
+    // - If targetUserId is set (and authorized), use it
+    // - Otherwise use the authenticated user's ID
+    // - If neither, sync all users (admin bulk sync for scheduled jobs)
+    let userId: string | null = targetUserId || authenticatedUserId;
 
     // If no specific user, sync all users with Strava connected
     const query = supabaseAdmin
