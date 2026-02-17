@@ -1,23 +1,29 @@
 
 
-## Fix: Leaderboard Shows "Anonymous" and Missing Users
+## Fix: Recreate `profiles_public` View Without `security_invoker`
 
-### Root Cause
+### Problem
 
-The `profiles_public` view was created with `security_invoker=on`. This means it inherits the base `profiles` table's row-level security, which only allows each user to see **their own row** (`auth.uid() = user_id`).
+The `profiles_public` view currently has `security_invoker=on` set. This means it inherits the base `profiles` table's RLS policy (`auth.uid() = user_id`), so each user can only see their own row. Result:
 
-So when User 2 queries the leaderboard:
-- **Monthly leaderboard**: fetches entries from `monthly_leaderboard` (public read), then tries to look up names from `profiles_public` -- but can only see their own name. Everyone else shows as "Anonymous".
-- **All-time leaderboard**: queries `profiles_public` directly -- only returns 1 row (their own profile). Other users are completely missing.
+- **Monthly tab**: User 1 shows as "ANONYMOUS" because User 2 can't read their profile
+- **All Time tab**: Only the logged-in user appears
 
-### Fix
+### What Will Change
 
-Recreate the `profiles_public` view **without** `security_invoker=on`. This makes the view run with the view owner's (superadmin) permissions, bypassing the restrictive RLS on the base `profiles` table. Since the view already excludes all sensitive columns (tokens, weight, sex, etc.), this is safe.
+A single database migration that:
 
-### Database Migration
+1. Drops the existing `profiles_public` view
+2. Recreates it **without** `security_invoker=on` (so it runs with owner permissions, bypassing the base table's RLS)
+3. Re-grants `SELECT` to `authenticated` and `anon` roles
+4. Notifies PostgREST to reload its schema cache so the API picks up the change immediately
 
+The view only exposes safe, non-sensitive columns (display_name, avatar_url, city, distances, streaks). No tokens or private data.
+
+### Technical Details
+
+**SQL Migration:**
 ```sql
--- Drop and recreate without security_invoker
 DROP VIEW IF EXISTS public.profiles_public;
 
 CREATE VIEW public.profiles_public AS
@@ -26,16 +32,12 @@ CREATE VIEW public.profiles_public AS
          longest_streak, created_at, updated_at
   FROM profiles;
 
--- Grant access to both roles
 GRANT SELECT ON public.profiles_public TO authenticated;
 GRANT SELECT ON public.profiles_public TO anon;
+
+NOTIFY pgrst, 'reload schema';
 ```
 
-### No Code Changes Needed
+### No Frontend Code Changes
 
-The frontend hooks (`useLeaderboard.ts`, `useProfile.ts`) and the Leaderboard page already query `profiles_public` correctly. Once the view permissions are fixed, all users will be visible with their real names.
-
-### What Users Will See After the Fix
-
-- **Monthly leaderboard**: All participants shown with their actual Strava display names and avatars
-- **All-time leaderboard**: All users listed and ranked by total distance, not just the logged-in user
+The existing hooks (`useLeaderboard.ts`, `useProfile.ts`) already query `profiles_public` correctly. Once the view permissions are fixed, all users will appear with their real Strava names and avatars on both the Monthly and All Time leaderboards.
