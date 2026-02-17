@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X, 
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 interface Race {
   id: string;
@@ -59,35 +60,13 @@ interface TrainingPlan {
 const Admin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
 
-  // Check admin status
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-
-      if (!roles) {
-        toast.error("Access denied. Admin only.");
-        navigate("/home");
-        return;
-      }
-
-      setIsAdmin(true);
-    };
-
-    checkAdmin();
-  }, [navigate]);
+  // Redirect non-admins
+  if (!adminLoading && !isAdmin) {
+    toast.error("Access denied. Admin only.");
+    navigate("/home");
+  }
 
   // Fetch data
   const { data: races, isLoading: racesLoading } = useQuery({
@@ -129,7 +108,7 @@ const Admin = () => {
     enabled: isAdmin === true,
   });
 
-  if (isAdmin === null) {
+  if (adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
