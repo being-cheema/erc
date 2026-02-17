@@ -1,43 +1,45 @@
 
 
-## Fix: Recreate `profiles_public` View Without `security_invoker`
+## Fix: Remove `security_invoker` from `profiles_public` View
 
-### Problem
+### Problem Confirmed
 
-The `profiles_public` view currently has `security_invoker=on` set. This means it inherits the base `profiles` table's RLS policy (`auth.uid() = user_id`), so each user can only see their own row. Result:
+The `profiles_public` view still has `security_invoker=on` in the database. This was confirmed by querying `pg_class.reloptions`. Despite previous approvals, the migration was never actually executed.
 
-- **Monthly tab**: User 1 shows as "ANONYMOUS" because User 2 can't read their profile
-- **All Time tab**: Only the logged-in user appears
+This causes:
+- Monthly leaderboard shows other users as "ANONYMOUS"
+- All-Time leaderboard only shows the logged-in user
 
-### What Will Change
+### Solution
 
-A single database migration that:
-
-1. Drops the existing `profiles_public` view
-2. Recreates it **without** `security_invoker=on` (so it runs with owner permissions, bypassing the base table's RLS)
-3. Re-grants `SELECT` to `authenticated` and `anon` roles
-4. Notifies PostgREST to reload its schema cache so the API picks up the change immediately
-
-The view only exposes safe, non-sensitive columns (display_name, avatar_url, city, distances, streaks). No tokens or private data.
+Run a single database migration to drop and recreate the view without `security_invoker=on`, then reload the API schema cache.
 
 ### Technical Details
 
-**SQL Migration:**
+**Database migration (SQL):**
+
 ```sql
+-- Drop the existing view with security_invoker=on
 DROP VIEW IF EXISTS public.profiles_public;
 
+-- Recreate WITHOUT security_invoker (runs with owner permissions, bypassing base table RLS)
 CREATE VIEW public.profiles_public AS
   SELECT id, user_id, display_name, avatar_url, city,
          total_distance, total_runs, current_streak,
          longest_streak, created_at, updated_at
   FROM profiles;
 
+-- Grant read access
 GRANT SELECT ON public.profiles_public TO authenticated;
 GRANT SELECT ON public.profiles_public TO anon;
 
+-- Force API to pick up the change
 NOTIFY pgrst, 'reload schema';
 ```
 
-### No Frontend Code Changes
+The view only exposes non-sensitive columns (names, avatars, distances, streaks). No tokens or private data.
 
-The existing hooks (`useLeaderboard.ts`, `useProfile.ts`) already query `profiles_public` correctly. Once the view permissions are fixed, all users will appear with their real Strava names and avatars on both the Monthly and All Time leaderboards.
+### No Frontend Changes Needed
+
+The existing `useLeaderboard.ts` and `useProfile.ts` hooks already query `profiles_public` correctly. Once the view is fixed, all users will appear with their real names on both leaderboard tabs.
+
