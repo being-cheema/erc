@@ -4,7 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ALLOWED_ORIGINS = [
   "https://id-preview--7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
   "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
-  // Add production domain when deployed
+  "https://strava-runners-connect.lovable.app",
+  "https://preview--strava-runners-connect.lovable.app",
 ];
 
 // Add development origins
