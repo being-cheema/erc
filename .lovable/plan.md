@@ -1,63 +1,37 @@
 
+## Add Admin Icon to Bottom Navigation
 
-## OTA Updates + Self-Hosting Setup
+### What Changes
+The bottom navigation bar will show a 6th icon (shield icon) for admin users only. Non-admin users see the same 5 tabs as today.
 
-### What OTA Means for Your App
+### How It Works
+1. **Create a reusable `useIsAdmin` hook** (`src/hooks/useIsAdmin.ts`) that queries the `user_roles` table for the current user's admin role. This replaces the inline check in `Admin.tsx` and can be reused anywhere.
 
-Your APK will be a thin "shell" -- it opens a WebView that loads your self-hosted website. When you deploy updates to your server, every user gets the new version automatically on next app open. A new APK is only needed if you change native plugins.
+2. **Update `BottomNav.tsx`** to:
+   - Import and call `useIsAdmin()`
+   - Conditionally append an "Admin" nav item (with `Shield` icon from lucide-react) to the nav list when the user is an admin
+   - The admin icon appears as the last item in the nav bar
 
-### Changes Required
+### Technical Details
 
-#### 1. `capacitor.config.ts` -- Point to Your Domain
+**New file: `src/hooks/useIsAdmin.ts`**
+- Uses `@tanstack/react-query` to query `user_roles` table
+- Returns `{ isAdmin: boolean, isLoading: boolean }`
+- Query key: `["isAdmin"]`
+- Checks for `role = 'admin'` matching the current authenticated user
 
-Uncomment the production server block and set it to your self-hosted URL. For now we'll use a placeholder you can replace later:
+**Modified file: `src/components/layout/BottomNav.tsx`**
+- Import `useIsAdmin` hook and `Shield` icon
+- Build the nav items array dynamically: base 5 items + admin item if `isAdmin` is true
+- No layout changes needed -- 6 items fit comfortably in the bottom nav
 
-```typescript
-server: {
-  url: 'https://your-domain.com',
-  cleartext: false,
-},
-```
-
-#### 2. `index.html` -- Fix Viewport and Branding
-
-- Add `viewport-fit=cover` to the viewport meta tag (required for safe areas on notched phones)
-- Update title from "Lovable App" to "Erode Runners Club"
-- Update all meta description and OG tags to match your app branding
-
-#### 3. `src/App.tsx` -- Add Offline Detection
-
-Since OTA requires network connectivity to load the app, add a simple offline detection wrapper that shows a "No internet connection" screen with a retry button when the device is offline and running inside Capacitor. Web users won't be affected.
-
-#### 4. `src/pages/Login.tsx` -- Fix Native OAuth
-
-Currently uses `window.location.href` to redirect to Strava, which breaks on native because it navigates the WebView away. However, since OTA mode loads from your server URL, `window.location.origin` will return your domain, so OAuth redirects will work correctly as long as your Strava app's redirect URI matches your domain + `/auth/callback`.
-
-No code change needed here for OTA mode -- the redirect flow works because the WebView is loading your website.
-
-#### 5. Self-Hosting Migration Doc Update
-
-Update `docs/SELF_HOSTING_MIGRATION.md` to include OTA-specific instructions:
-- How to configure the Capacitor server URL
-- How to set up Strava OAuth redirect URIs for the self-hosted domain
-- How to rebuild the APK after config changes
-- Reminder: only rebuild APK when native config changes
+**Optional cleanup in `src/pages/Admin.tsx`**
+- Replace the inline admin check with the new `useIsAdmin` hook for consistency
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `capacitor.config.ts` | Set `server.url` to self-hosted domain |
-| `index.html` | Add `viewport-fit=cover`, update branding to "Erode Runners Club" |
-| `src/App.tsx` | Add offline detection component for native app |
-| `docs/SELF_HOSTING_MIGRATION.md` | Add OTA section with deployment instructions |
-
-### After Implementation
-
-Once you migrate to your own server:
-1. Replace `https://your-domain.com` in `capacitor.config.ts` with your actual domain
-2. Add your domain to the Strava OAuth redirect URI allowlist
-3. Run `npx cap sync` and rebuild the APK
-4. Deploy your web app to your server
-5. Every future web deploy = instant update for all users
-
+| `src/hooks/useIsAdmin.ts` | New reusable hook to check admin role |
+| `src/components/layout/BottomNav.tsx` | Conditionally show Admin nav item |
+| `src/pages/Admin.tsx` | Refactor to use shared `useIsAdmin` hook |
