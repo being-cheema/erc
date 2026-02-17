@@ -1,45 +1,63 @@
 
 
-## Fix: Remove `security_invoker` from `profiles_public` View
+## OTA Updates + Self-Hosting Setup
 
-### Problem Confirmed
+### What OTA Means for Your App
 
-The `profiles_public` view still has `security_invoker=on` in the database. This was confirmed by querying `pg_class.reloptions`. Despite previous approvals, the migration was never actually executed.
+Your APK will be a thin "shell" -- it opens a WebView that loads your self-hosted website. When you deploy updates to your server, every user gets the new version automatically on next app open. A new APK is only needed if you change native plugins.
 
-This causes:
-- Monthly leaderboard shows other users as "ANONYMOUS"
-- All-Time leaderboard only shows the logged-in user
+### Changes Required
 
-### Solution
+#### 1. `capacitor.config.ts` -- Point to Your Domain
 
-Run a single database migration to drop and recreate the view without `security_invoker=on`, then reload the API schema cache.
+Uncomment the production server block and set it to your self-hosted URL. For now we'll use a placeholder you can replace later:
 
-### Technical Details
-
-**Database migration (SQL):**
-
-```sql
--- Drop the existing view with security_invoker=on
-DROP VIEW IF EXISTS public.profiles_public;
-
--- Recreate WITHOUT security_invoker (runs with owner permissions, bypassing base table RLS)
-CREATE VIEW public.profiles_public AS
-  SELECT id, user_id, display_name, avatar_url, city,
-         total_distance, total_runs, current_streak,
-         longest_streak, created_at, updated_at
-  FROM profiles;
-
--- Grant read access
-GRANT SELECT ON public.profiles_public TO authenticated;
-GRANT SELECT ON public.profiles_public TO anon;
-
--- Force API to pick up the change
-NOTIFY pgrst, 'reload schema';
+```typescript
+server: {
+  url: 'https://your-domain.com',
+  cleartext: false,
+},
 ```
 
-The view only exposes non-sensitive columns (names, avatars, distances, streaks). No tokens or private data.
+#### 2. `index.html` -- Fix Viewport and Branding
 
-### No Frontend Changes Needed
+- Add `viewport-fit=cover` to the viewport meta tag (required for safe areas on notched phones)
+- Update title from "Lovable App" to "Erode Runners Club"
+- Update all meta description and OG tags to match your app branding
 
-The existing `useLeaderboard.ts` and `useProfile.ts` hooks already query `profiles_public` correctly. Once the view is fixed, all users will appear with their real names on both leaderboard tabs.
+#### 3. `src/App.tsx` -- Add Offline Detection
+
+Since OTA requires network connectivity to load the app, add a simple offline detection wrapper that shows a "No internet connection" screen with a retry button when the device is offline and running inside Capacitor. Web users won't be affected.
+
+#### 4. `src/pages/Login.tsx` -- Fix Native OAuth
+
+Currently uses `window.location.href` to redirect to Strava, which breaks on native because it navigates the WebView away. However, since OTA mode loads from your server URL, `window.location.origin` will return your domain, so OAuth redirects will work correctly as long as your Strava app's redirect URI matches your domain + `/auth/callback`.
+
+No code change needed here for OTA mode -- the redirect flow works because the WebView is loading your website.
+
+#### 5. Self-Hosting Migration Doc Update
+
+Update `docs/SELF_HOSTING_MIGRATION.md` to include OTA-specific instructions:
+- How to configure the Capacitor server URL
+- How to set up Strava OAuth redirect URIs for the self-hosted domain
+- How to rebuild the APK after config changes
+- Reminder: only rebuild APK when native config changes
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `capacitor.config.ts` | Set `server.url` to self-hosted domain |
+| `index.html` | Add `viewport-fit=cover`, update branding to "Erode Runners Club" |
+| `src/App.tsx` | Add offline detection component for native app |
+| `docs/SELF_HOSTING_MIGRATION.md` | Add OTA section with deployment instructions |
+
+### After Implementation
+
+Once you migrate to your own server:
+1. Replace `https://your-domain.com` in `capacitor.config.ts` with your actual domain
+2. Add your domain to the Strava OAuth redirect URI allowlist
+3. Run `npx cap sync` and rebuild the APK
+4. Deploy your web app to your server
+5. Every future web deploy = instant update for all users
 
