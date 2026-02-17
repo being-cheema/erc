@@ -199,6 +199,16 @@
   .active-indicator {
     @apply w-1 h-4 bg-primary rounded-full;
   }
+
+  /* Primary gradient */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(16 100% 42%));
+  }
+
+  /* Primary glow */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+  }
 }
 
 /* Animations */

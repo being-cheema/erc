@@ -32,8 +32,8 @@ const Training = () => {
         animate={{ opacity: 1, y: 0 }}
         className="px-4 pt-6 pb-4"
       >
-        <h1 className="text-2xl font-bold text-foreground">Training Plans</h1>
-        <p className="text-muted-foreground text-sm">Structured programs for every goal</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Programs</p>
+        <h1 className="text-xl font-black text-foreground uppercase tracking-tight">Training Plans</h1>
       </motion.header>
 
       <div className="px-4 space-y-4">

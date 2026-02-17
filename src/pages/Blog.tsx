@@ -17,8 +17,8 @@ const Blog = () => {
         animate={{ opacity: 1, y: 0 }}
         className="px-4 pt-6 pb-4"
       >
-        <h1 className="text-2xl font-bold text-foreground">Blog</h1>
-        <p className="text-muted-foreground text-sm">Tips, stories, and running wisdom</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Explore</p>
+        <h1 className="text-xl font-black text-foreground uppercase tracking-tight">Blog</h1>
       </motion.header>
 
       <div className="px-4 space-y-4">
