@@ -1083,4 +1083,73 @@ find /backups -name "*.sql.gz" -mtime +30 -delete
 
 ---
 
-*Last updated: January 2026*
+## 11. OTA (Over-The-Air) Updates
+
+The app uses a **web-shell architecture** for free OTA updates. The native APK is a thin shell that loads your self-hosted website in a WebView. When you deploy web updates to your server, every user gets them automatically on next app open.
+
+### 11.1 How It Works
+
+```
+┌─────────────────────────────────────┐
+│  Native APK (rarely changes)        │
+│  ┌───────────────────────────────┐  │
+│  │  WebView                      │  │
+│  │  loads: https://your-domain   │  │
+│  │  (your self-hosted site)      │  │
+│  └───────────────────────────────┘  │
+│  + Capacitor plugins (haptics,     │
+│    push, splash, status bar)       │
+└─────────────────────────────────────┘
+```
+
+- **Web deploy** → instant update for all users (UI, logic, CSS, etc.)
+- **New APK required** only when you change `capacitor.config.ts` or add/remove native plugins
+
+### 11.2 Configuration
+
+In `capacitor.config.ts`, the `server.url` is set to your domain:
+
+```typescript
+server: {
+  url: 'https://your-domain.com', // Replace with your actual domain
+  cleartext: false,
+},
+```
+
+### 11.3 Setting Up Your Domain
+
+1. Replace `https://your-domain.com` in `capacitor.config.ts` with your actual domain
+2. Add your domain to the Strava app's **Authorization Callback Domain** at https://www.strava.com/settings/api
+3. Update the `ALLOWED_REDIRECT_URIS` in your backend's strava-auth route to include `https://your-domain.com/auth/callback`
+
+### 11.4 Rebuilding the APK
+
+After changing `capacitor.config.ts`:
+
+```bash
+git pull
+npm install
+npm run build
+npx cap sync
+npx cap open android   # Build APK in Android Studio
+```
+
+### 11.5 When to Rebuild APK
+
+| Change Type | New APK Needed? |
+|---|---|
+| UI/CSS/component changes | ❌ No (auto via OTA) |
+| New pages or routes | ❌ No (auto via OTA) |
+| Bug fixes in TypeScript | ❌ No (auto via OTA) |
+| Backend API changes | ❌ No (auto via OTA) |
+| Add/remove Capacitor plugin | ✅ Yes |
+| Change `capacitor.config.ts` | ✅ Yes |
+| Change app icon or splash screen | ✅ Yes |
+
+### 11.6 Offline Handling
+
+The app includes built-in offline detection. When a native user has no internet, a full-screen "No Internet Connection" message appears with a retry button. The app auto-reconnects when connectivity is restored.
+
+---
+
+*Last updated: February 2026*

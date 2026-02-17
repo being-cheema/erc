@@ -5,18 +5,20 @@ const config: CapacitorConfig = {
   appName: 'Erode Runners Club',
   webDir: 'dist',
   
-  // === DEVELOPMENT MODE (OTA Updates) ===
-  // Uncomment for hot-reload during development:
+  // === OTA MODE (Production) ===
+  // The app loads from your self-hosted server.
+  // Deploy web updates to your server = instant update for all users.
+  // Only rebuild APK when native plugins or this config change.
+  server: {
+    url: 'https://your-domain.com', // TODO: Replace with your actual self-hosted domain
+    cleartext: false,
+  },
+
+  // === DEVELOPMENT MODE ===
+  // Uncomment below (and comment out OTA block above) for hot-reload during development:
   // server: {
-  //   url: 'https://7b78d716-a91e-4441-86b0-b30684e91214.lovableproject.com?forceHideBadge=true',
+  //   url: 'http://localhost:5173',
   //   cleartext: true,
-  // },
-  
-  // === PRODUCTION MODE (Bundled) ===
-  // For self-hosted deployment, use:
-  // server: {
-  //   url: 'https://your-domain.com',
-  //   cleartext: false,
   // },
 
   plugins: {
