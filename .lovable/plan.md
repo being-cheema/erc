@@ -1,22 +1,41 @@
 
-## Fix: CORS Blocking on `sync-strava` for Published Site
 
-The `sync-strava` backend function has the same issue we already fixed on `strava-auth` -- it only allows requests from the preview domain, not the published domain.
+## Fix: Leaderboard Shows "Anonymous" and Missing Users
 
-### What Will Change
+### Root Cause
 
-**File: `supabase/functions/sync-strava/index.ts`**
+The `profiles_public` view was created with `security_invoker=on`. This means it inherits the base `profiles` table's row-level security, which only allows each user to see **their own row** (`auth.uid() = user_id`).
 
-Add the published and preview domains to the allowed origins list (lines 4-8):
+So when User 2 queries the leaderboard:
+- **Monthly leaderboard**: fetches entries from `monthly_leaderboard` (public read), then tries to look up names from `profiles_public` -- but can only see their own name. Everyone else shows as "Anonymous".
+- **All-time leaderboard**: queries `profiles_public` directly -- only returns 1 row (their own profile). Other users are completely missing.
 
-```text
-Current:
-  "https://id-preview--7b78d716-a91e-4441-86b0-b30684e91214.lovable.app"
-  "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app"
+### Fix
 
-Updated (add two entries):
-+ "https://strava-runners-connect.lovable.app"
-+ "https://preview--strava-runners-connect.lovable.app"
+Recreate the `profiles_public` view **without** `security_invoker=on`. This makes the view run with the view owner's (superadmin) permissions, bypassing the restrictive RLS on the base `profiles` table. Since the view already excludes all sensitive columns (tokens, weight, sex, etc.), this is safe.
+
+### Database Migration
+
+```sql
+-- Drop and recreate without security_invoker
+DROP VIEW IF EXISTS public.profiles_public;
+
+CREATE VIEW public.profiles_public AS
+  SELECT id, user_id, display_name, avatar_url, city,
+         total_distance, total_runs, current_streak,
+         longest_streak, created_at, updated_at
+  FROM profiles;
+
+-- Grant access to both roles
+GRANT SELECT ON public.profiles_public TO authenticated;
+GRANT SELECT ON public.profiles_public TO anon;
 ```
 
-Then redeploy the function. No other files need to change.
+### No Code Changes Needed
+
+The frontend hooks (`useLeaderboard.ts`, `useProfile.ts`) and the Leaderboard page already query `profiles_public` correctly. Once the view permissions are fixed, all users will be visible with their real names.
+
+### What Users Will See After the Fix
+
+- **Monthly leaderboard**: All participants shown with their actual Strava display names and avatars
+- **All-time leaderboard**: All users listed and ranked by total distance, not just the logged-in user
