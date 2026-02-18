@@ -66,7 +66,7 @@ const Settings = () => {
     if (profile) {
       setDisplayName(profile.display_name || "");
       setAvatarUrl(profile.avatar_url || "");
-      setMonthlyGoal(Math.round((profile.monthly_distance_goal as number || 100000) / 1000));
+      setMonthlyGoal(parseFloat(((profile.monthly_distance_goal as number || 100000) / 1000).toFixed(1)));
     }
   }, [profile]);
 

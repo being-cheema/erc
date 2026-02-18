@@ -34,8 +34,10 @@ const Home = () => {
   } = usePullToRefresh(() => {
     queryClient.invalidateQueries({ queryKey: ["profile"] });
     queryClient.invalidateQueries({ queryKey: ["activities"] });
-    queryClient.invalidateQueries({ queryKey: ["monthlyLeaderboard"] });
-    queryClient.invalidateQueries({ queryKey: ["allTimeLeaderboard"] });
+    queryClient.invalidateQueries({ queryKey: ["leaderboard", "monthly"] });
+    queryClient.invalidateQueries({ queryKey: ["leaderboard", "alltime"] });
+    queryClient.invalidateQueries({ queryKey: ["userRank"] });
+    queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
   });
 
   const upcomingRace = races?.[0];

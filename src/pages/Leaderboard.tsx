@@ -25,8 +25,9 @@ const Leaderboard = () => {
     handleTouchEnd,
   } = usePullToRefresh(() => {
     queryClient.invalidateQueries({ queryKey: ["profile"] });
-    queryClient.invalidateQueries({ queryKey: ["monthlyLeaderboard"] });
-    queryClient.invalidateQueries({ queryKey: ["allTimeLeaderboard"] });
+    queryClient.invalidateQueries({ queryKey: ["leaderboard", "monthly"] });
+    queryClient.invalidateQueries({ queryKey: ["leaderboard", "alltime"] });
+    queryClient.invalidateQueries({ queryKey: ["userRank"] });
   });
 
   const getRankChange = (change: number | null) => {

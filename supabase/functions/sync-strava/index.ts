@@ -645,11 +645,15 @@ Deno.serve(async (req) => {
         // Fetch detailed data for activities we're storing (heart rate, elevation, etc.)
         const activityDetails = await fetchRecentActivityDetails(accessToken, newActivitiesToStore, 50);
 
-        // Calculate totals
-        const monthlyDistance = monthlyRuns.reduce((sum, a) => sum + a.distance, 0);
-        const monthlyRunsCount = monthlyRuns.length;
+        // Calculate total distance from in-memory allRuns (always accurate for full sync,
+        // and for incremental: allRuns = uniqueNewRuns + storedRunData which are already deduplicated)
         const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
         const totalRunsCount = allRuns.length;
+
+        // NOTE: monthlyDistance will be recalculated from DB after upsert below (Bug #0 fix)
+        // Using placeholder values here; real values computed after upsert
+        let monthlyDistance = 0;
+        let monthlyRunsCount = 0;
 
         // Calculate total elevation from detailed activities
         let totalElevation = 0;
@@ -723,6 +727,29 @@ Deno.serve(async (req) => {
         const runDates = allRuns.map((r) => new Date(r.start_date));
         const { currentStreak, longestStreak } = calculateStreaks(runDates);
 
+        // BUG #0 FIX: After upserting, query DB for real monthly total to avoid double-counting
+        const startOfMonthForQuery = new Date();
+        startOfMonthForQuery.setDate(1);
+        startOfMonthForQuery.setHours(0, 0, 0, 0);
+
+        const { data: monthlyActivitiesFromDB } = await supabaseAdmin
+          .from("activities")
+          .select("distance")
+          .eq("user_id", profile.user_id)
+          .gte("start_date", startOfMonthForQuery.toISOString());
+
+        monthlyDistance = (monthlyActivitiesFromDB || []).reduce((sum: number, a: { distance: number }) => sum + Number(a.distance), 0);
+        monthlyRunsCount = monthlyActivitiesFromDB?.length || 0;
+
+        console.log(`Real monthly distance from DB: ${monthlyDistance}m (${monthlyRunsCount} runs)`);
+
+        // BUG #2 FIX: Fetch current profile to protect user-set display_name and avatar_url
+        const { data: currentProfileData } = await supabaseAdmin
+          .from("profiles")
+          .select("display_name, avatar_url")
+          .eq("user_id", profile.user_id)
+          .single();
+
         // Update profile with athlete data
         const profileUpdate: any = {
           total_distance: totalDistance,
@@ -735,8 +762,9 @@ Deno.serve(async (req) => {
 
         // Add athlete data if available
         if (athlete) {
-          profileUpdate.display_name = profileUpdate.display_name || `${athlete.firstname} ${athlete.lastname}`.trim();
-          profileUpdate.avatar_url = profileUpdate.avatar_url || athlete.profile || athlete.profile_medium;
+          // Only set display_name/avatar from Strava if user hasn't set their own
+          profileUpdate.display_name = currentProfileData?.display_name || `${athlete.firstname} ${athlete.lastname}`.trim();
+          profileUpdate.avatar_url = currentProfileData?.avatar_url || athlete.profile || athlete.profile_medium;
           profileUpdate.city = athlete.city;
           profileUpdate.country = athlete.country;
           profileUpdate.weight = athlete.weight;

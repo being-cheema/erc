@@ -19,7 +19,8 @@ const Races = () => {
   const { data: races, isLoading } = useRaces();
   const registerMutation = useRegisterForRace();
   const unregisterMutation = useUnregisterFromRace();
-  const [selectedRace, setSelectedRace] = useState<Race | null>(null);
+  const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
+  const selectedRace = races?.find(r => r.id === selectedRaceId) ?? null;
 
   const handleRegister = async (raceId: string, isRegistered: boolean) => {
     try {
@@ -36,7 +37,7 @@ const Races = () => {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + "T00:00:00"); // local timezone
     return {
       month: format(date, "MMM").toUpperCase(),
       day: format(date, "d"),
@@ -45,7 +46,7 @@ const Races = () => {
   };
 
   const getCountdown = (dateStr: string) => {
-    const raceDate = new Date(dateStr);
+    const raceDate = new Date(dateStr + "T00:00:00"); // local timezone
     if (isPast(raceDate)) return null;
     const days = differenceInDays(raceDate, new Date());
     if (days === 0) return "Today!";
@@ -195,7 +196,7 @@ const Races = () => {
             <TabsContent value="calendar" className="mt-4">
               <RaceCalendar 
                 races={races || []} 
-                onRaceSelect={setSelectedRace}
+                onRaceSelect={(race) => setSelectedRaceId(race?.id ?? null)}
               />
             </TabsContent>
 
@@ -207,7 +208,7 @@ const Races = () => {
       </div>
 
       {/* Race Detail Sheet */}
-      <Sheet open={!!selectedRace} onOpenChange={(open) => !open && setSelectedRace(null)}>
+      <Sheet open={!!selectedRace} onOpenChange={(open) => !open && setSelectedRaceId(null)}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-sm">
           {selectedRace && (
             <>
@@ -271,7 +272,7 @@ const Races = () => {
                     className="flex-1 h-12"
                     onClick={() => {
                       handleRegister(selectedRace.id, selectedRace.is_registered || false);
-                      setSelectedRace(null);
+                      setSelectedRaceId(null);
                     }}
                     disabled={registerMutation.isPending || unregisterMutation.isPending}
                   >

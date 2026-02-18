@@ -272,7 +272,7 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => { setCreating(true); setForm({ is_published: false }); }} className="w-full">
+      <Button onClick={() => { setCreating(true); setEditing(null); setForm({ is_published: false }); }} className="w-full">
         <Plus className="w-4 h-4 mr-2" /> Add Race
       </Button>
 
@@ -352,7 +352,7 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setEditing(race.id); setForm(race); }}
+                onClick={() => { setEditing(race.id); setCreating(false); setForm(race); }}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
@@ -375,6 +375,14 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<BlogPost>>({});
 
+  // BUG #9 FIX: Get current user to set author_id on new posts
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
+  }, []);
+
   const saveMutation = useMutation({
     mutationFn: async (post: Partial<BlogPost>) => {
       const slug = post.slug || post.title?.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "";
@@ -394,6 +402,7 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
           excerpt,
           image_url,
           is_published,
+          author_id: currentUserId,
         });
         if (error) throw error;
       }
@@ -427,7 +436,7 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => { setCreating(true); setForm({ is_published: false, category: "Tips" }); }} className="w-full">
+      <Button onClick={() => { setCreating(true); setEditing(null); setForm({ is_published: false, category: "Tips" }); }} className="w-full">
         <Plus className="w-4 h-4 mr-2" /> Add Post
       </Button>
 
@@ -504,7 +513,7 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setEditing(post.id); setForm(post); }}
+                onClick={() => { setEditing(post.id); setCreating(false); setForm(post); }}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
@@ -577,7 +586,7 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => { setCreating(true); setForm({ is_published: false, level: "Beginner", duration_weeks: 8 }); }} className="w-full">
+      <Button onClick={() => { setCreating(true); setEditing(null); setForm({ is_published: false, level: "Beginner", duration_weeks: 8 }); }} className="w-full">
         <Plus className="w-4 h-4 mr-2" /> Add Training Plan
       </Button>
 
@@ -654,7 +663,7 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setEditing(plan.id); setForm(plan); }}
+                onClick={() => { setEditing(plan.id); setCreating(false); setForm(plan); }}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
