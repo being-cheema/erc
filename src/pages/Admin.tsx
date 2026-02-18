@@ -254,19 +254,11 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
                 value={form.location || ""}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
-              <Select
+              <Input
+                placeholder="Distance (e.g. 5K, 10K, Half Marathon)"
                 value={form.distance_type || ""}
-                onValueChange={(v) => setForm({ ...form, distance_type: v })}
-              >
-                <SelectTrigger><SelectValue placeholder="Distance" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5K">5K</SelectItem>
-                  <SelectItem value="10K">10K</SelectItem>
-                  <SelectItem value="Half Marathon">Half Marathon</SelectItem>
-                  <SelectItem value="Marathon">Marathon</SelectItem>
-                  <SelectItem value="Ultra">Ultra</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setForm({ ...form, distance_type: e.target.value })}
+              />
             </div>
             <Input
               type="date"
