@@ -727,21 +727,13 @@ Deno.serve(async (req) => {
         const runDates = allRuns.map((r) => new Date(r.start_date));
         const { currentStreak, longestStreak } = calculateStreaks(runDates);
 
-        // BUG #0 FIX: After upserting, query DB for real monthly total to avoid double-counting
-        const startOfMonthForQuery = new Date();
-        startOfMonthForQuery.setDate(1);
-        startOfMonthForQuery.setHours(0, 0, 0, 0);
+        // Use DB function to atomically recalculate monthly leaderboard from activities table
+        // This is the only source of truth and prevents any double-counting
+        await supabaseAdmin.rpc('recalculate_monthly_leaderboard', {
+          target_user_id: profile.user_id
+        });
 
-        const { data: monthlyActivitiesFromDB } = await supabaseAdmin
-          .from("activities")
-          .select("distance")
-          .eq("user_id", profile.user_id)
-          .gte("start_date", startOfMonthForQuery.toISOString());
-
-        monthlyDistance = (monthlyActivitiesFromDB || []).reduce((sum: number, a: { distance: number }) => sum + Number(a.distance), 0);
-        monthlyRunsCount = monthlyActivitiesFromDB?.length || 0;
-
-        console.log(`Real monthly distance from DB: ${monthlyDistance}m (${monthlyRunsCount} runs)`);
+        console.log(`Monthly leaderboard recalculated via DB function for user ${profile.user_id}`);
 
         // BUG #2 FIX: Fetch current profile to protect user-set display_name and avatar_url
         const { data: currentProfileData } = await supabaseAdmin
@@ -784,39 +776,7 @@ Deno.serve(async (req) => {
           console.error("Profile update error:", updateError);
         }
 
-        // Update monthly leaderboard
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-
-        const { data: existing } = await supabaseAdmin
-          .from("monthly_leaderboard")
-          .select("id")
-          .eq("user_id", profile.user_id)
-          .eq("year", year)
-          .eq("month", month)
-          .maybeSingle();
-
-        if (existing) {
-          await supabaseAdmin
-            .from("monthly_leaderboard")
-            .update({
-              total_distance: monthlyDistance,
-              total_runs: monthlyRunsCount,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", existing.id);
-        } else {
-          await supabaseAdmin
-            .from("monthly_leaderboard")
-            .insert({
-              user_id: profile.user_id,
-              year,
-              month,
-              total_distance: monthlyDistance,
-              total_runs: monthlyRunsCount,
-            });
-        }
+        // Leaderboard already updated via recalculate_monthly_leaderboard RPC above
 
         // Check for new achievements
         const newAchievements = await checkAndUnlockAchievements(
