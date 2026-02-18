@@ -1,37 +1,49 @@
 
-## Add Admin Icon to Bottom Navigation
+## Fix Race Distance Field: Replace Dropdown with Free-Text Input
+
+### The Problem
+The race form uses a locked `<Select>` dropdown for the `distance_type` field, limiting admins to only 5 predefined options: 5K, 10K, Half Marathon, Marathon, Ultra. Since `distance_type` is a plain `text` column in the database, it can hold any value — but the UI prevents entering custom distances like 8K, 15K, 21.1K, 30K, trail races, etc.
+
+### The Fix
+Replace the `<Select>` dropdown with a standard text `<Input>` field that has a helpful placeholder, so admins can type any distance freely.
+
+To preserve usability (discoverability of common values), a small hint below the field will suggest the most common formats. This is simpler and more reliable than a combobox.
 
 ### What Changes
-The bottom navigation bar will show a 6th icon (shield icon) for admin users only. Non-admin users see the same 5 tabs as today.
 
-### How It Works
-1. **Create a reusable `useIsAdmin` hook** (`src/hooks/useIsAdmin.ts`) that queries the `user_roles` table for the current user's admin role. This replaces the inline check in `Admin.tsx` and can be reused anywhere.
+**File: `src/pages/Admin.tsx`**
 
-2. **Update `BottomNav.tsx`** to:
-   - Import and call `useIsAdmin()`
-   - Conditionally append an "Admin" nav item (with `Shield` icon from lucide-react) to the nav list when the user is an admin
-   - The admin icon appears as the last item in the nav bar
+In the `RacesAdmin` component, lines ~257-269, replace:
+```
+<Select
+  value={form.distance_type || ""}
+  onValueChange={(v) => setForm({ ...form, distance_type: v })}
+>
+  <SelectTrigger><SelectValue placeholder="Distance" /></SelectTrigger>
+  <SelectContent>
+    <SelectItem value="5K">5K</SelectItem>
+    <SelectItem value="10K">10K</SelectItem>
+    <SelectItem value="Half Marathon">Half Marathon</SelectItem>
+    <SelectItem value="Marathon">Marathon</SelectItem>
+    <SelectItem value="Ultra">Ultra</SelectItem>
+  </SelectContent>
+</Select>
+```
 
-### Technical Details
+With a plain text input:
+```
+<Input
+  placeholder="Distance (e.g. 5K, 10K, Half Marathon)"
+  value={form.distance_type || ""}
+  onChange={(e) => setForm({ ...form, distance_type: e.target.value })}
+/>
+```
 
-**New file: `src/hooks/useIsAdmin.ts`**
-- Uses `@tanstack/react-query` to query `user_roles` table
-- Returns `{ isAdmin: boolean, isLoading: boolean }`
-- Query key: `["isAdmin"]`
-- Checks for `role = 'admin'` matching the current authenticated user
-
-**Modified file: `src/components/layout/BottomNav.tsx`**
-- Import `useIsAdmin` hook and `Shield` icon
-- Build the nav items array dynamically: base 5 items + admin item if `isAdmin` is true
-- No layout changes needed -- 6 items fit comfortably in the bottom nav
-
-**Optional cleanup in `src/pages/Admin.tsx`**
-- Replace the inline admin check with the new `useIsAdmin` hook for consistency
+### Result
+Admins can type any distance freely — "8K", "15K", "25K", "Trail 50K", "42.2K", anything — with no restrictions. The placeholder guides them on the expected format.
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useIsAdmin.ts` | New reusable hook to check admin role |
-| `src/components/layout/BottomNav.tsx` | Conditionally show Admin nav item |
-| `src/pages/Admin.tsx` | Refactor to use shared `useIsAdmin` hook |
+| `src/pages/Admin.tsx` | Replace `<Select>` with `<Input>` for race distance field |
