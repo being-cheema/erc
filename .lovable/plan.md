@@ -1,202 +1,106 @@
 
-# Complete Logical Bug Fix Plan — Final
+# Fix: Leaderboard Monthly Distance Doubling — Root Cause & Complete Fix
 
-This fixes all 9 confirmed bugs found across the codebase, plus the newly confirmed leaderboard distance doubling bug. Here is every bug, its root cause confirmed by exact line numbers, and the precise fix.
+## Root Cause (Confirmed)
 
----
+The DB confirms:
+- `activities` table: **1 run, 5,008.9m** (correct)
+- `monthly_leaderboard` table: **2 runs, 10,017.8m** (exactly 2×)
 
-## BUG 0 — Leaderboard Monthly Distance is Doubled (Critical — newly added)
+The previous fix (querying the DB after upsert) is logically correct but **arrived too late** — the leaderboard row already held `10,017.8m` from a sync that ran using the old doubling code. The fix only corrects future syncs. No sync has run since the fix was deployed, so the stale doubled value is still sitting in the table.
 
-**Root cause:** `sync-strava/index.ts` lines 616-631 (incremental sync path):
-
-```ts
-// monthlyRuns = new Strava runs THIS month
-monthlyRuns = newRuns.filter(a => new Date(a.start_date) >= startOfMonth);
-
-// Then ADDS all stored monthly runs from DB
-const storedMonthlyRuns = storedRunData.filter(a => ...startOfMonth);
-monthlyRuns = [...monthlyRuns, ...storedMonthlyRuns...];
-```
-
-Then line 649:
-```ts
-const monthlyDistance = monthlyRuns.reduce((sum, a) => sum + a.distance, 0);
-```
-
-The problem: `newRuns` are immediately upserted into the DB (line 705-713), so the very next sync will have those same runs in `storedRunData`. But even within a SINGLE sync, if `newRuns` contains runs that were already stored (e.g., yesterday's run from the -1 day lookback window on line 556), they exist in BOTH `newRuns` AND `storedMonthlyRuns`. Result: distance counted twice.
-
-**Fix:** After upserting activities, calculate `monthlyDistance` directly from a fresh DB query instead of from the in-memory `monthlyRuns` array. This is the only guaranteed-accurate source:
-
-```ts
-// After upsert, query the DB for the real monthly total
-const { data: monthlyActivities } = await supabaseAdmin
-  .from("activities")
-  .select("distance")
-  .eq("user_id", profile.user_id)
-  .gte("start_date", startOfMonth.toISOString());
-
-const monthlyDistance = (monthlyActivities || [])
-  .reduce((sum, a) => sum + Number(a.distance), 0);
-const monthlyRunsCount = monthlyActivities?.length || 0;
-```
-
-This applies to BOTH the full sync and incremental sync paths, replacing the in-memory calculation entirely.
+There is also a deeper structural risk: the fix in the edge function does a raw TypeScript query, which is harder to verify and could be silently wrong in edge cases (e.g. server timezone, no-limit row truncation at 1000 rows for users with many runs). Moving the calculation into the database itself is the safest and most reliable approach.
 
 ---
 
-## BUG 1 — Pull-to-Refresh Never Refetches Leaderboard or Rank (Critical)
+## What Will Be Done
 
-**Root cause:**
+### Step 1 — SQL Migration: Fix Stale Data Immediately
 
-`Home.tsx` lines 37-38 invalidates:
-- `["monthlyLeaderboard"]` — does NOT match stored key `["leaderboard", "monthly", year, month]`
-- `["allTimeLeaderboard"]` — does NOT match stored key `["leaderboard", "alltime"]`
-- `["userRank"]` — NOT invalidated at all on Home
+A migration that recalculates `total_distance` and `total_runs` in `monthly_leaderboard` directly from the `activities` table for every user for the current month. This corrects the `10,017.8m` to `5,008.9m` right now without needing a sync.
 
-`Leaderboard.tsx` lines 28-29 has the same wrong keys.
+```sql
+UPDATE monthly_leaderboard ml
+SET
+  total_distance = (
+    SELECT COALESCE(SUM(a.distance), 0)
+    FROM activities a
+    WHERE a.user_id = ml.user_id
+      AND a.start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+      AND a.start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
+  ),
+  total_runs = (
+    SELECT COUNT(*)
+    FROM activities a
+    WHERE a.user_id = ml.user_id
+      AND a.start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+      AND a.start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
+  ),
+  updated_at = NOW()
+WHERE year  = EXTRACT(YEAR  FROM NOW() AT TIME ZONE 'UTC')
+  AND month = EXTRACT(MONTH FROM NOW() AT TIME ZONE 'UTC');
+```
 
-**Fix:** In both `Home.tsx` and `Leaderboard.tsx`, update all `invalidateQueries` calls to match the actual keys used in `useLeaderboard.ts` and `useUserRank.ts`:
-- `["leaderboard", "monthly"]` (TanStack Query prefix-matches year/month)
-- `["leaderboard", "alltime"]`
-- `["userRank"]` (add this to `Home.tsx`)
-- `["monthlyDistance"]` (add this to `Home.tsx` for goal progress)
+### Step 2 — SQL Migration: Create DB Function for Future Syncs
+
+A `recalculate_monthly_leaderboard(target_user_id uuid)` database function (SECURITY DEFINER, called with the service role key from the edge function). It:
+
+1. Calculates the true monthly distance and run count directly from `activities` with a single SQL aggregation — no possibility of double-counting
+2. Upserts into `monthly_leaderboard` using the `(user_id, year, month)` unique key conflict — no separate select/insert/update flow needed
+
+```sql
+CREATE OR REPLACE FUNCTION public.recalculate_monthly_leaderboard(target_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_year  int := EXTRACT(YEAR  FROM NOW() AT TIME ZONE 'UTC');
+  v_month int := EXTRACT(MONTH FROM NOW() AT TIME ZONE 'UTC');
+  v_dist  numeric;
+  v_runs  int;
+BEGIN
+  SELECT
+    COALESCE(SUM(distance), 0),
+    COUNT(*)
+  INTO v_dist, v_runs
+  FROM activities
+  WHERE user_id   = target_user_id
+    AND start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+    AND start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month';
+
+  INSERT INTO monthly_leaderboard (user_id, year, month, total_distance, total_runs, updated_at)
+  VALUES (target_user_id, v_year, v_month, v_dist, v_runs, NOW())
+  ON CONFLICT (user_id, year, month)
+  DO UPDATE SET
+    total_distance = EXCLUDED.total_distance,
+    total_runs     = EXCLUDED.total_runs,
+    updated_at     = NOW();
+END;
+$$;
+```
+
+### Step 3 — Update Edge Function
+
+Replace the TypeScript DB query + manual update logic (lines 730–818 in `sync-strava/index.ts`) with a single call to the new DB function:
+
+```ts
+// Replace the entire manual monthly calculation + leaderboard upsert block with:
+await supabaseAdmin.rpc('recalculate_monthly_leaderboard', {
+  target_user_id: profile.user_id
+});
+```
+
+This removes ~90 lines of brittle TypeScript arithmetic and delegates it entirely to the database, which is the only reliable source of truth.
 
 ---
 
-## BUG 2 — Strava Sync Always Overwrites User-Set Display Name & Avatar (Critical)
+## Files Changed
 
-**Root cause:** `sync-strava/index.ts` lines 727-739:
+| File | Change |
+|------|--------|
+| `supabase/migrations/...fix_leaderboard.sql` | New migration: fix stale data + create DB function |
+| `supabase/functions/sync-strava/index.ts` | Replace ~90 lines of manual leaderboard calculation with `supabaseAdmin.rpc('recalculate_monthly_leaderboard', ...)` |
 
-```ts
-const profileUpdate: any = {
-  total_distance: ...,
-  // profileUpdate is a FRESH empty object
-};
-// ...
-profileUpdate.display_name = profileUpdate.display_name || `${athlete.firstname}...`
-// profileUpdate.display_name is always undefined → always overwrites with Strava name
-```
-
-Every sync overwrites whatever the user set in Settings.
-
-**Fix:** Before building `profileUpdate`, fetch the current profile's `display_name` and `avatar_url` from DB. Only fallback to Strava values if DB values are `null` or empty:
-
-```ts
-const { data: currentProfile } = await supabaseAdmin
-  .from("profiles")
-  .select("display_name, avatar_url")
-  .eq("user_id", profile.user_id)
-  .single();
-
-profileUpdate.display_name = currentProfile?.display_name || `${athlete.firstname} ${athlete.lastname}`.trim();
-profileUpdate.avatar_url = currentProfile?.avatar_url || athlete.profile;
-```
-
----
-
-## BUG 3 — Race Date Timezone Bug (Medium)
-
-**Root cause:** `Races.tsx` lines 39 and 48:
-```ts
-const raceDate = new Date(dateStr); // "2025-03-15" parsed as midnight UTC
-if (isPast(raceDate)) return null;  // true at 5:30 AM in IST
-```
-Race appears as "past" before it starts for IST users.
-
-**Fix:** Parse as local midnight in both `formatDate` and `getCountdown`:
-```ts
-const date = new Date(dateStr + "T00:00:00"); // local timezone
-```
-
----
-
-## BUG 4 — GoalProgress Card Navigates to Settings Instead of Stats (UX)
-
-**Root cause:** `GoalProgress.tsx` line 47:
-```ts
-onClick={() => navigate("/settings")}
-```
-
-**Fix:** Change to `navigate("/stats")`.
-
----
-
-## BUG 5 — Race Sheet Shows Stale Registration State (UX)
-
-**Root cause:** `Races.tsx` line 22: `selectedRace` is a copied JS object, not a live reference. After registering and query refetching, the `is_registered` field in the sheet is stale until component re-renders propagate.
-
-**Fix:** Store only `selectedRaceId: string | null` in state, derive the live race object from the `races` array:
-```ts
-const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
-const selectedRace = races?.find(r => r.id === selectedRaceId) ?? null;
-```
-Update `setSelectedRace` calls to `setSelectedRaceId`.
-
----
-
-## BUG 6 — Admin Creating/Editing Can Show Both Forms Simultaneously (Medium)
-
-**Root cause:** `Admin.tsx` — clicking "Add" while editing sets `creating = true` without clearing `editing`. The form condition `(creating || editing)` means both forms are truthy simultaneously.
-
-**Fix:** In each admin sub-component (RacesAdmin, BlogAdmin, TrainingAdmin):
-- "Add" button: `setCreating(true); setEditing(null); setForm({...defaults})`
-- "Edit" button: `setEditing(item.id); setCreating(false); setForm(item)`
-
----
-
-## BUG 7 — AuthRouter: Logged-In Users Forced Through Onboarding on New Devices (Medium)
-
-**Root cause:** `AuthRouter.tsx` lines 63-68: The `!onboardingComplete` check happens BEFORE the session check. A logged-in user on a new device (no localStorage) is sent to `/onboarding`.
-
-**Fix:** Reorder logic — session existence always takes priority:
-```ts
-if (session) {
-  // Authenticated users never see onboarding or login
-  if (["/onboarding", "/login", "/"].includes(currentPath)) {
-    return <Navigate to="/home" replace />;
-  }
-  return <>{children}</>;
-}
-// No session below this point
-if (!onboardingComplete) { ... }
-```
-
----
-
-## BUG 8 — Monthly Goal Rounds Decimal Precision Away (Low)
-
-**Root cause:** `Settings.tsx` line 69:
-```ts
-setMonthlyGoal(Math.round((profile.monthly_distance_goal || 100000) / 1000));
-```
-A goal of 42.2 km rounds to 42.
-
-**Fix:** Remove `Math.round`, use `parseFloat`:
-```ts
-setMonthlyGoal(parseFloat(((profile.monthly_distance_goal as number || 100000) / 1000).toFixed(1)));
-```
-
----
-
-## BUG 9 — Blog Post `author_id` Never Set When Creating (Missing Data)
-
-**Root cause:** `Admin.tsx` `BlogAdmin` lines 388-398: The insert payload never includes `author_id`. The column exists in `blog_posts` but is always `null`.
-
-**Fix:** In `BlogAdmin`, fetch the current user via `useCurrentUser()` hook, then include `author_id: user?.id` in the insert payload.
-
----
-
-## Summary of All Files Changed
-
-| File | Bugs Fixed |
-|------|-----------|
-| `supabase/functions/sync-strava/index.ts` | Bug #0 (distance doubling), Bug #2 (display_name overwrite) |
-| `src/pages/Home.tsx` | Bug #1 (pull-to-refresh query keys) |
-| `src/pages/Leaderboard.tsx` | Bug #1 (pull-to-refresh query keys) |
-| `src/components/home/GoalProgress.tsx` | Bug #4 (navigate to /stats) |
-| `src/pages/Races.tsx` | Bug #3 (timezone), Bug #5 (stale sheet state), Bug #6 (form collision) |
-| `src/pages/Admin.tsx` | Bug #6 (form collision all tabs), Bug #9 (author_id) |
-| `src/pages/Settings.tsx` | Bug #8 (decimal goal precision) |
-| `src/components/AuthRouter.tsx` | Bug #7 (session-first auth routing) |
-
-No database schema changes required. All fixes are code-only. The edge function (`sync-strava`) will be redeployed automatically.
+No frontend changes needed. The leaderboard will show correct data immediately after the migration runs and will remain correct on all future syncs.
