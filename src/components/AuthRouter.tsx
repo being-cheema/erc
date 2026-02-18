@@ -59,6 +59,15 @@ const AuthRouter = ({ children }: AuthRouterProps) => {
     return <>{children}</>;
   }
 
+  // BUG #7 FIX: Session takes priority — authenticated users never hit onboarding/login
+  if (session) {
+    if (currentPath === "/onboarding" || currentPath === "/login" || currentPath === "/") {
+      return <Navigate to="/home" replace />;
+    }
+    return <>{children}</>;
+  }
+
+  // No session below this point
   // First-time user: hasn't completed onboarding
   if (!onboardingComplete) {
     if (currentPath !== "/onboarding") {
@@ -68,19 +77,8 @@ const AuthRouter = ({ children }: AuthRouterProps) => {
   }
 
   // Onboarding complete but no session: needs login
-  if (onboardingComplete && !session) {
-    if (currentPath !== "/login" && currentPath !== "/onboarding") {
-      return <Navigate to="/login" replace />;
-    }
-    return <>{children}</>;
-  }
-
-  // Onboarding complete and has session: redirect away from auth pages
-  if (onboardingComplete && session) {
-    if (currentPath === "/onboarding" || currentPath === "/login" || currentPath === "/") {
-      return <Navigate to="/home" replace />;
-    }
-    return <>{children}</>;
+  if (currentPath !== "/login" && currentPath !== "/onboarding") {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

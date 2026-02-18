@@ -44,7 +44,7 @@ const GoalProgress = () => {
         className={`bg-card border p-5 press-scale cursor-pointer ${
           isGoalMet ? "border-success" : "border-border"
         }`}
-        onClick={() => navigate("/settings")}
+        onClick={() => navigate("/stats")}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
