@@ -86,6 +86,10 @@ const BlogPost = () => {
               <Calendar className="w-4 h-4" />
               <span>{format(new Date(post.created_at), "MMMM d, yyyy")}</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span>·</span>
+              <span>{Math.max(1, Math.ceil(((post.content?.length || 0) / 5) / 200))} min read</span>
+            </div>
           </div>
 
           {post.excerpt && (

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, List, MapPin, Users, ChevronRight, Loader2, Check } from "lucide-react";
+import { Calendar, List, MapPin, Users, ChevronRight, Loader2, Check, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRaces, useRegisterForRace, useUnregisterFromRace, Race } from "@/hooks/useRaces";
-import { format } from "date-fns";
+import { format, differenceInDays, isPast } from "date-fns";
 import { toast } from "sonner";
 import RaceCalendar from "@/components/races/RaceCalendar";
 import {
@@ -42,6 +42,15 @@ const Races = () => {
       day: format(date, "d"),
       full: format(date, "MMMM d, yyyy"),
     };
+  };
+
+  const getCountdown = (dateStr: string) => {
+    const raceDate = new Date(dateStr);
+    if (isPast(raceDate)) return null;
+    const days = differenceInDays(raceDate, new Date());
+    if (days === 0) return "Today!";
+    if (days === 1) return "Tomorrow";
+    return `${days}d away`;
   };
 
   const RaceListView = () => (
@@ -103,6 +112,12 @@ const Races = () => {
                           <Users className="w-3 h-3" />
                           <span>{race.participant_count || 0} joined</span>
                         </div>
+                        {getCountdown(race.race_date) && (
+                          <div className="flex items-center gap-1 text-primary text-xs font-bold">
+                            <Clock className="w-3 h-3" />
+                            <span>{getCountdown(race.race_date)}</span>
+                          </div>
+                        )}
                       </div>
                       {race.description && (
                         <p className="text-muted-foreground text-xs mt-2 line-clamp-2">

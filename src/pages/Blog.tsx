@@ -82,9 +82,14 @@ const Blog = () => {
                       <span className="text-muted-foreground text-xs">
                         {format(new Date(article.created_at), "MMM d, yyyy")}
                       </span>
-                      <div className="flex items-center gap-1 text-primary text-sm font-medium">
-                        <span>Read more</span>
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground text-xs">
+                          {Math.max(1, Math.ceil(((article.content?.length || 0) / 5) / 200))} min read
+                        </span>
+                        <div className="flex items-center gap-1 text-primary text-sm font-medium">
+                          <span>Read more</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
                   </div>

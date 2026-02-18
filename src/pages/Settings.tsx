@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw } from "lucide-react";
+import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -439,6 +439,26 @@ const Settings = () => {
             </Card>
           </motion.div>
         )}
+
+        {/* Sign Out Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="pb-4"
+        >
+          <Button
+            variant="outline"
+            className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/login");
+            }}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </motion.div>
       </div>
     </div>
   );
