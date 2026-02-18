@@ -1,11 +1,10 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, Trophy, Zap, LogOut, Dumbbell } from "lucide-react";
+import { ChevronRight, Calendar, Trophy, Zap, Settings, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useRaces } from "@/hooks/useRaces";
 import { useUserRank } from "@/hooks/useUserRank";
-import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import logo from "@/assets/logo.png";
@@ -22,7 +21,7 @@ const Home = () => {
   const { data: profile } = useProfile();
   const { data: races } = useRaces();
   const { data: userRank } = useUserRank();
-  const { lightImpact, mediumImpact } = useHaptics();
+  const { lightImpact } = useHaptics();
 
   const {
     isRefreshing,
@@ -46,12 +45,6 @@ const Home = () => {
     if (hour < 12) return "Good Morning";
     if (hour < 18) return "Good Afternoon";
     return "Good Evening";
-  };
-
-  const handleLogout = async () => {
-    mediumImpact();
-    await supabase.auth.signOut();
-    navigate("/login");
   };
 
   const handleCardTap = (path: string) => {
@@ -95,6 +88,14 @@ const Home = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/settings")}
+              className="rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
             <Avatar 
               className="w-10 h-10 cursor-pointer border-2 border-border"
               onClick={() => navigate("/settings")}
@@ -104,14 +105,6 @@ const Home = () => {
                 {profile?.display_name?.[0]?.toUpperCase() || "R"}
               </AvatarFallback>
             </Avatar>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={handleLogout}
-              className="rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary"
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
           </div>
         </div>
       </motion.header>

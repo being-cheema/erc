@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X, 
-  ArrowLeft, Loader2, Calendar 
+  ArrowLeft, Loader2, Calendar, AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,17 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Race {
   id: string;
@@ -62,11 +73,13 @@ const Admin = () => {
   const queryClient = useQueryClient();
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
 
-  // Redirect non-admins
-  if (!adminLoading && !isAdmin) {
-    toast.error("Access denied. Admin only.");
-    navigate("/home");
-  }
+  // Fix: useEffect to avoid state update during render
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) {
+      toast.error("Access denied. Admin only.");
+      navigate("/home");
+    }
+  }, [adminLoading, isAdmin, navigate]);
 
   // Fetch data
   const { data: races, isLoading: racesLoading } = useQuery({
@@ -168,6 +181,37 @@ const Admin = () => {
     </div>
   );
 };
+
+// Reusable Delete Confirm Dialog
+const DeleteConfirmDialog = ({ onConfirm, label }: { onConfirm: () => void; label: string }) => (
+  <AlertDialog>
+    <AlertDialogTrigger asChild>
+      <Button variant="ghost" size="icon">
+        <Trash2 className="w-4 h-4 text-destructive" />
+      </Button>
+    </AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-destructive" />
+          Delete {label}?
+        </AlertDialogTitle>
+        <AlertDialogDescription>
+          This action cannot be undone. This will permanently delete this {label.toLowerCase()} and all associated data.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          onClick={onConfirm}
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        >
+          Delete
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
 
 // Races Admin Component
 const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => {
@@ -312,13 +356,10 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteMutation.mutate(race.id)}
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
+              <DeleteConfirmDialog
+                label="Race"
+                onConfirm={() => deleteMutation.mutate(race.id)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -467,13 +508,10 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteMutation.mutate(post.id)}
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
+              <DeleteConfirmDialog
+                label="Post"
+                onConfirm={() => deleteMutation.mutate(post.id)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -571,18 +609,11 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
                   <SelectItem value="Advanced">Advanced</SelectItem>
                 </SelectContent>
               </Select>
-              <Select
+              <Input
+                placeholder="Goal Distance (e.g. 5K, 10K)"
                 value={form.goal_distance || ""}
-                onValueChange={(v) => setForm({ ...form, goal_distance: v })}
-              >
-                <SelectTrigger><SelectValue placeholder="Goal Distance" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5K">5K</SelectItem>
-                  <SelectItem value="10K">10K</SelectItem>
-                  <SelectItem value="Half Marathon">Half Marathon</SelectItem>
-                  <SelectItem value="Marathon">Marathon</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setForm({ ...form, goal_distance: e.target.value })}
+              />
             </div>
             <Input
               type="number"
@@ -627,13 +658,10 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteMutation.mutate(plan.id)}
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
+              <DeleteConfirmDialog
+                label="Training Plan"
+                onConfirm={() => deleteMutation.mutate(plan.id)}
+              />
             </div>
           </CardContent>
         </Card>
