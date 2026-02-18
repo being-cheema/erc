@@ -663,6 +663,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      recalculate_monthly_leaderboard: {
+        Args: { target_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "member"
