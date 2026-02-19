@@ -1,106 +1,181 @@
 
-# Fix: Leaderboard Monthly Distance Doubling — Root Cause & Complete Fix
+# Strava Disconnect with Full Data Wipe
 
-## Root Cause (Confirmed)
+## What the feature does
 
-The DB confirms:
-- `activities` table: **1 run, 5,008.9m** (correct)
-- `monthly_leaderboard` table: **2 runs, 10,017.8m** (exactly 2×)
+A "Disconnect Strava" button appears below the Force Full Sync button in the Strava Connection card. Tapping it opens an AlertDialog warning the user that this will permanently delete all their activity data, leaderboard entries, achievements, and race registrations. On confirmation, the app:
 
-The previous fix (querying the DB after upsert) is logically correct but **arrived too late** — the leaderboard row already held `10,017.8m` from a sync that ran using the old doubling code. The fix only corrects future syncs. No sync has run since the fix was deployed, so the stale doubled value is still sitting in the table.
-
-There is also a deeper structural risk: the fix in the edge function does a raw TypeScript query, which is harder to verify and could be silently wrong in edge cases (e.g. server timezone, no-limit row truncation at 1000 rows for users with many runs). Moving the calculation into the database itself is the safest and most reliable approach.
+1. Calls a new edge function (`disconnect-strava`) using the service role key to delete all rows the user cannot delete via RLS policies
+2. Deletes the rows the user CAN delete client-side (race registrations, training progress, push tokens)
+3. Clears the Strava credentials and resets stats on the profile row client-side
+4. Invalidates all relevant query cache keys
+5. Shows a success toast and signs the user out so they land on the login screen fresh
 
 ---
 
-## What Will Be Done
+## Root Cause Analysis: Why an Edge Function is Needed
 
-### Step 1 — SQL Migration: Fix Stale Data Immediately
+Three tables have **no DELETE RLS policy**, meaning the logged-in user cannot delete their own rows using the client SDK:
 
-A migration that recalculates `total_distance` and `total_runs` in `monthly_leaderboard` directly from the `activities` table for every user for the current month. This corrects the `10,017.8m` to `5,008.9m` right now without needing a sync.
+| Table | Can user delete? | Reason |
+|---|---|---|
+| `activities` | No | No DELETE policy exists |
+| `monthly_leaderboard` | No | No DELETE policy exists |
+| `user_achievements` | No | No DELETE policy exists |
+| `race_participants` | Yes | Policy: `auth.uid() = user_id` |
+| `user_training_progress` | Yes | Policy: `auth.uid() = user_id` |
+| `push_tokens` | Yes | Policy: `auth.uid() = user_id` |
 
-```sql
-UPDATE monthly_leaderboard ml
-SET
-  total_distance = (
-    SELECT COALESCE(SUM(a.distance), 0)
-    FROM activities a
-    WHERE a.user_id = ml.user_id
-      AND a.start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
-      AND a.start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
-  ),
-  total_runs = (
-    SELECT COUNT(*)
-    FROM activities a
-    WHERE a.user_id = ml.user_id
-      AND a.start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
-      AND a.start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
-  ),
-  updated_at = NOW()
-WHERE year  = EXTRACT(YEAR  FROM NOW() AT TIME ZONE 'UTC')
-  AND month = EXTRACT(MONTH FROM NOW() AT TIME ZONE 'UTC');
+The edge function uses the **service role key** (already configured as `SUPABASE_SERVICE_ROLE_KEY`) to bypass RLS and hard-delete from those three tables.
+
+---
+
+## Technical Plan
+
+### Step 1 — New Edge Function: `disconnect-strava`
+
+**File:** `supabase/functions/disconnect-strava/index.ts`
+
+The function:
+- Validates the user's JWT from the `Authorization` header
+- Uses `supabaseAdmin` (service role) to delete from:
+  - `activities` where `user_id = caller`
+  - `monthly_leaderboard` where `user_id = caller`
+  - `user_achievements` where `user_id = caller`
+- Returns `{ success: true }` or error
+
+It does NOT touch `profiles` — the profile Strava fields are cleared client-side (user has UPDATE permission on their own profile).
+
+### Step 2 — `Settings.tsx` Changes
+
+**Add imports:**
+```tsx
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Unlink } from "lucide-react";
 ```
 
-### Step 2 — SQL Migration: Create DB Function for Future Syncs
-
-A `recalculate_monthly_leaderboard(target_user_id uuid)` database function (SECURITY DEFINER, called with the service role key from the edge function). It:
-
-1. Calculates the true monthly distance and run count directly from `activities` with a single SQL aggregation — no possibility of double-counting
-2. Upserts into `monthly_leaderboard` using the `(user_id, year, month)` unique key conflict — no separate select/insert/update flow needed
-
-```sql
-CREATE OR REPLACE FUNCTION public.recalculate_monthly_leaderboard(target_user_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_year  int := EXTRACT(YEAR  FROM NOW() AT TIME ZONE 'UTC');
-  v_month int := EXTRACT(MONTH FROM NOW() AT TIME ZONE 'UTC');
-  v_dist  numeric;
-  v_runs  int;
-BEGIN
-  SELECT
-    COALESCE(SUM(distance), 0),
-    COUNT(*)
-  INTO v_dist, v_runs
-  FROM activities
-  WHERE user_id   = target_user_id
-    AND start_date >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
-    AND start_date <  date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month';
-
-  INSERT INTO monthly_leaderboard (user_id, year, month, total_distance, total_runs, updated_at)
-  VALUES (target_user_id, v_year, v_month, v_dist, v_runs, NOW())
-  ON CONFLICT (user_id, year, month)
-  DO UPDATE SET
-    total_distance = EXCLUDED.total_distance,
-    total_runs     = EXCLUDED.total_runs,
-    updated_at     = NOW();
-END;
-$$;
+**Add state:**
+```tsx
+const [isDisconnecting, setIsDisconnecting] = useState(false);
 ```
 
-### Step 3 — Update Edge Function
-
-Replace the TypeScript DB query + manual update logic (lines 730–818 in `sync-strava/index.ts`) with a single call to the new DB function:
-
+**Add handler `handleDisconnectStrava`:**
 ```ts
-// Replace the entire manual monthly calculation + leaderboard upsert block with:
-await supabaseAdmin.rpc('recalculate_monthly_leaderboard', {
-  target_user_id: profile.user_id
-});
+const handleDisconnectStrava = async () => {
+  setIsDisconnecting(true);
+  mediumImpact();
+
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error("Not authenticated");
+
+    // Step 1: Call edge function to delete rows the user can't delete via RLS
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/disconnect-strava`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Failed to delete data");
+    }
+
+    // Step 2: Delete rows the user CAN delete client-side
+    if (user?.id) {
+      await supabase.from("race_participants").delete().eq("user_id", user.id);
+      await supabase.from("user_training_progress").delete().eq("user_id", user.id);
+      await supabase.from("push_tokens").delete().eq("user_id", user.id);
+    }
+
+    // Step 3: Clear Strava credentials + reset stats on profile
+    await supabase
+      .from("profiles")
+      .update({
+        strava_id: null,
+        strava_access_token: null,
+        strava_refresh_token: null,
+        strava_token_expires_at: null,
+        total_distance: 0,
+        total_runs: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        last_synced_at: null,
+      })
+      .eq("user_id", user!.id);
+
+    // Step 4: Invalidate all queries
+    await queryClient.invalidateQueries({ queryKey: ["profile"] });
+    await queryClient.invalidateQueries({ queryKey: ["activities"] });
+    await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    await queryClient.invalidateQueries({ queryKey: ["userRank"] });
+    await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
+    await queryClient.invalidateQueries({ queryKey: ["userAchievements"] });
+
+    notificationSuccess();
+    toast.success("Strava disconnected and all data removed");
+
+    // Step 5: Sign out
+    await supabase.auth.signOut();
+    navigate("/login");
+  } catch (error: any) {
+    console.error("Disconnect error:", error);
+    toast.error(error.message || "Failed to disconnect Strava");
+    setIsDisconnecting(false);
+  }
+};
 ```
 
-This removes ~90 lines of brittle TypeScript arithmetic and delegates it entirely to the database, which is the only reliable source of truth.
+**Add AlertDialog + Disconnect button** inside the Strava Connection card, below the Force Full Sync button and its description paragraph:
+
+```tsx
+<AlertDialog>
+  <AlertDialogTrigger asChild>
+    <Button
+      variant="outline"
+      disabled={isDisconnecting}
+      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
+    >
+      {isDisconnecting ? (
+        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+      ) : (
+        <Unlink className="w-4 h-4 mr-2" />
+      )}
+      {isDisconnecting ? "Disconnecting..." : "Disconnect Strava"}
+    </Button>
+  </AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Disconnect Strava?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This will permanently delete all your activity data, leaderboard entries, achievements, and race registrations from this app. Your Strava account itself will not be affected. This action cannot be undone.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction
+        onClick={handleDisconnectStrava}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      >
+        Yes, disconnect and delete data
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
 
 ---
 
 ## Files Changed
 
 | File | Change |
-|------|--------|
-| `supabase/migrations/...fix_leaderboard.sql` | New migration: fix stale data + create DB function |
-| `supabase/functions/sync-strava/index.ts` | Replace ~90 lines of manual leaderboard calculation with `supabaseAdmin.rpc('recalculate_monthly_leaderboard', ...)` |
+|---|---|
+| `supabase/functions/disconnect-strava/index.ts` | New edge function — deletes `activities`, `monthly_leaderboard`, `user_achievements` using service role |
+| `src/pages/Settings.tsx` | Add AlertDialog + Disconnect Strava button + handler |
 
-No frontend changes needed. The leaderboard will show correct data immediately after the migration runs and will remain correct on all future syncs.
+No database schema changes needed. No new secrets needed — `SUPABASE_SERVICE_ROLE_KEY` is already configured. Edge function deploys automatically.
