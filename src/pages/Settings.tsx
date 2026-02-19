@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut } from "lucide-react";
+import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Unlink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +47,7 @@ const Settings = () => {
   const [monthlyGoal, setMonthlyGoal] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Fetch notification preferences
   const { data: notifications, isLoading: notificationsLoading } = useQuery({
@@ -150,6 +162,75 @@ const Settings = () => {
   const handleBackTap = () => {
     lightImpact();
     navigate(-1);
+  };
+
+  const handleDisconnectStrava = async () => {
+    setIsDisconnecting(true);
+    mediumImpact();
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      // Call edge function to delete rows the user can't delete via RLS
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/disconnect-strava`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to delete data");
+      }
+
+      // Delete rows the user CAN delete client-side
+      if (user?.id) {
+        await supabase.from("race_participants").delete().eq("user_id", user.id);
+        await supabase.from("user_training_progress").delete().eq("user_id", user.id);
+        await supabase.from("push_tokens").delete().eq("user_id", user.id);
+      }
+
+      // Clear Strava credentials + reset stats on profile
+      await supabase
+        .from("profiles")
+        .update({
+          strava_id: null,
+          strava_access_token: null,
+          strava_refresh_token: null,
+          strava_token_expires_at: null,
+          total_distance: 0,
+          total_runs: 0,
+          current_streak: 0,
+          longest_streak: 0,
+          last_synced_at: null,
+        })
+        .eq("user_id", user!.id);
+
+      // Invalidate all queries
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      await queryClient.invalidateQueries({ queryKey: ["userRank"] });
+      await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
+      await queryClient.invalidateQueries({ queryKey: ["userAchievements"] });
+
+      notificationSuccess();
+      toast.success("Strava disconnected and all data removed");
+
+      // Sign out
+      await supabase.auth.signOut();
+      navigate("/login");
+    } catch (error: any) {
+      console.error("Disconnect error:", error);
+      toast.error(error.message || "Failed to disconnect Strava");
+      setIsDisconnecting(false);
+    }
   };
 
   const handleForceSync = async () => {
@@ -435,6 +516,41 @@ const Settings = () => {
                 <p className="text-xs text-muted-foreground text-center">
                   Re-import all activities with detailed metrics
                 </p>
+
+                {/* Disconnect Strava */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={isDisconnecting || isSyncing}
+                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
+                    >
+                      {isDisconnecting ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Unlink className="w-4 h-4 mr-2" />
+                      )}
+                      {isDisconnecting ? "Disconnecting..." : "Disconnect Strava"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disconnect Strava?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete all your activity data, leaderboard entries, achievements, and race registrations from this app. Your Strava account itself will not be affected. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDisconnectStrava}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Yes, disconnect and delete data
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           </motion.div>
