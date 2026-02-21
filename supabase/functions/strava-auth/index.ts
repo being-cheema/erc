@@ -137,8 +137,14 @@ Deno.serve(async (req) => {
       let isNewUser = false;
 
       if (existingProfile) {
-        // User exists, update tokens
+        // User exists, update tokens — but preserve user-set display_name/avatar
         userId = existingProfile.user_id;
+
+        const { data: currentProfileData } = await supabase
+          .from("profiles")
+          .select("display_name, avatar_url")
+          .eq("user_id", userId)
+          .single();
         
         await supabase
           .from("profiles")
@@ -146,60 +152,96 @@ Deno.serve(async (req) => {
             strava_access_token: access_token,
             strava_refresh_token: refresh_token,
             strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
-            display_name: `${athlete.firstname} ${athlete.lastname}`,
-            avatar_url: athlete.profile,
+            display_name: currentProfileData?.display_name || `${athlete.firstname} ${athlete.lastname}`,
+            avatar_url: currentProfileData?.avatar_url || athlete.profile,
             city: athlete.city || null,
           })
           .eq("user_id", userId);
       } else {
-        // Create new user in auth.users
+        // New user OR reconnecting user (disconnected previously)
         isNewUser = true;
         const email = `strava_${athlete.id}@eroderunners.local`;
         const password = crypto.randomUUID();
 
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: {
-            strava_id: athlete.id,
+        // Check if an auth user with this email already exists
+        // (happens when user disconnected Strava — profile strava_id cleared but auth user remains)
+        const { data: existingUsers } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === email);
+
+        if (existingAuthUser) {
+          // Auth user exists but profile was cleared (reconnect after disconnect)
+          userId = existingAuthUser.id;
+          isNewUser = false;
+
+          // Upsert the profile (re-link strava_id and update tokens)
+          await supabase.from("profiles").upsert({
+            user_id: userId,
+            strava_id: athlete.id.toString(),
+            strava_access_token: access_token,
+            strava_refresh_token: refresh_token,
+            strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
             display_name: `${athlete.firstname} ${athlete.lastname}`,
             avatar_url: athlete.profile,
-          },
-        });
+            city: athlete.city || null,
+          }, { onConflict: "user_id" });
 
-        if (authError) {
-          console.error("Auth creation error:", authError);
-          return new Response(
-            JSON.stringify({ error: "Failed to create user account" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          // Ensure member role exists
+          await supabase.from("user_roles").upsert({
+            user_id: userId,
+            role: "member",
+          }, { onConflict: "user_id,role" });
+
+          // Ensure notification preferences exist
+          await supabase.from("notification_preferences").upsert({
+            user_id: userId,
+          }, { onConflict: "user_id" });
+
+        } else {
+          // Truly new user — create auth account
+          const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+              strava_id: athlete.id,
+              display_name: `${athlete.firstname} ${athlete.lastname}`,
+              avatar_url: athlete.profile,
+            },
+          });
+
+          if (authError) {
+            console.error("Auth creation error:", authError);
+            return new Response(
+              JSON.stringify({ error: "Failed to create user account" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          userId = authData.user.id;
+
+          // Create profile
+          await supabase.from("profiles").insert({
+            user_id: userId,
+            strava_id: athlete.id.toString(),
+            strava_access_token: access_token,
+            strava_refresh_token: refresh_token,
+            strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
+            display_name: `${athlete.firstname} ${athlete.lastname}`,
+            avatar_url: athlete.profile,
+            city: athlete.city || null,
+          });
+
+          // Assign member role
+          await supabase.from("user_roles").insert({
+            user_id: userId,
+            role: "member",
+          });
+
+          // Create default notification preferences
+          await supabase.from("notification_preferences").insert({
+            user_id: userId,
+          });
         }
-
-        userId = authData.user.id;
-
-        // Create profile
-        await supabase.from("profiles").insert({
-          user_id: userId,
-          strava_id: athlete.id.toString(),
-          strava_access_token: access_token,
-          strava_refresh_token: refresh_token,
-          strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
-          display_name: `${athlete.firstname} ${athlete.lastname}`,
-          avatar_url: athlete.profile,
-          city: athlete.city || null,
-        });
-
-        // Assign member role
-        await supabase.from("user_roles").insert({
-          user_id: userId,
-          role: "member",
-        });
-
-        // Create default notification preferences
-        await supabase.from("notification_preferences").insert({
-          user_id: userId,
-        });
       }
 
       // Generate a magic link for the user to sign in
