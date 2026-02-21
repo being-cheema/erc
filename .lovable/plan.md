@@ -1,181 +1,141 @@
 
-# Strava Disconnect with Full Data Wipe
+# Fix: "Failed to create user account" after Strava Disconnect
 
-## What the feature does
+## Root Cause (Confirmed by DB + Logs)
 
-A "Disconnect Strava" button appears below the Force Full Sync button in the Strava Connection card. Tapping it opens an AlertDialog warning the user that this will permanently delete all their activity data, leaderboard entries, achievements, and race registrations. On confirmation, the app:
+The disconnect flow correctly clears `strava_id` from the `profiles` table and signs the user out — but it does NOT delete the auth account (the row in `auth.users` with email `strava_101181627@eroderunners.local`).
 
-1. Calls a new edge function (`disconnect-strava`) using the service role key to delete all rows the user cannot delete via RLS policies
-2. Deletes the rows the user CAN delete client-side (race registrations, training progress, push tokens)
-3. Clears the Strava credentials and resets stats on the profile row client-side
-4. Invalidates all relevant query cache keys
-5. Shows a success toast and signs the user out so they land on the login screen fresh
+When that user tries to reconnect Strava:
 
----
+1. `strava-auth` callback checks `profiles` for `strava_id = athlete.id` → finds nothing (cleared by disconnect)
+2. Falls into the "new user" branch
+3. Calls `supabase.auth.admin.createUser({ email: "strava_101181627@eroderunners.local" })`
+4. Crashes with `422 email_exists` → returns 500 "Failed to create user account"
 
-## Root Cause Analysis: Why an Edge Function is Needed
+The DB confirms exactly this:
+- `auth.users` has `strava_101181627@eroderunners.local` (auth account still alive)
+- `profiles` has `strava_id = null` for that user (cleared by disconnect)
 
-Three tables have **no DELETE RLS policy**, meaning the logged-in user cannot delete their own rows using the client SDK:
+## Two-Part Fix
 
-| Table | Can user delete? | Reason |
-|---|---|---|
-| `activities` | No | No DELETE policy exists |
-| `monthly_leaderboard` | No | No DELETE policy exists |
-| `user_achievements` | No | No DELETE policy exists |
-| `race_participants` | Yes | Policy: `auth.uid() = user_id` |
-| `user_training_progress` | Yes | Policy: `auth.uid() = user_id` |
-| `push_tokens` | Yes | Policy: `auth.uid() = user_id` |
+### Fix 1 — `strava-auth/index.ts`: Handle the "reconnecting user" case
 
-The edge function uses the **service role key** (already configured as `SUPABASE_SERVICE_ROLE_KEY`) to bypass RLS and hard-delete from those three tables.
+In the "new user" branch (line 155), before calling `createUser`, first check if an auth user with that email already exists using `getUserByEmail`. If found, treat it as an existing user (update tokens, upsert profile) rather than trying to create a new one.
 
----
-
-## Technical Plan
-
-### Step 1 — New Edge Function: `disconnect-strava`
-
-**File:** `supabase/functions/disconnect-strava/index.ts`
-
-The function:
-- Validates the user's JWT from the `Authorization` header
-- Uses `supabaseAdmin` (service role) to delete from:
-  - `activities` where `user_id = caller`
-  - `monthly_leaderboard` where `user_id = caller`
-  - `user_achievements` where `user_id = caller`
-- Returns `{ success: true }` or error
-
-It does NOT touch `profiles` — the profile Strava fields are cleared client-side (user has UPDATE permission on their own profile).
-
-### Step 2 — `Settings.tsx` Changes
-
-**Add imports:**
-```tsx
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Unlink } from "lucide-react";
-```
-
-**Add state:**
-```tsx
-const [isDisconnecting, setIsDisconnecting] = useState(false);
-```
-
-**Add handler `handleDisconnectStrava`:**
 ```ts
-const handleDisconnectStrava = async () => {
-  setIsDisconnecting(true);
-  mediumImpact();
+// NEW: Check if auth user already exists with this Strava email
+const stravaEmail = `strava_${athlete.id}@eroderunners.local`;
+const { data: existingAuthUser } = await supabase.auth.admin.listUsers();
+// More efficient: use getUserByEmail via admin API
+```
 
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (!token) throw new Error("Not authenticated");
+The precise fix replaces the `else` block logic:
 
-    // Step 1: Call edge function to delete rows the user can't delete via RLS
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/disconnect-strava`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Failed to delete data");
+```ts
+} else {
+  // New user OR reconnecting user (disconnected previously)
+  isNewUser = true;
+  const email = `strava_${athlete.id}@eroderunners.local`;
+  const password = crypto.randomUUID();
+
+  // First, check if an auth user with this email already exists
+  // (happens when user disconnected Strava — profile cleared but auth user remains)
+  const { data: existingUsers } = await supabase.auth.admin.listUsers();
+  const existingAuthUser = existingUsers?.users?.find(u => u.email === email);
+
+  if (existingAuthUser) {
+    // Auth user exists but profile was cleared (reconnect after disconnect)
+    userId = existingAuthUser.id;
+    isNewUser = false;
+
+    // Upsert the profile (re-link strava_id and update tokens)
+    await supabase.from("profiles").upsert({
+      user_id: userId,
+      strava_id: athlete.id.toString(),
+      strava_access_token: access_token,
+      strava_refresh_token: refresh_token,
+      strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
+      display_name: `${athlete.firstname} ${athlete.lastname}`,
+      avatar_url: athlete.profile,
+      city: athlete.city || null,
+    }, { onConflict: "user_id" });
+
+    // Ensure member role exists
+    await supabase.from("user_roles").upsert({
+      user_id: userId,
+      role: "member",
+    }, { onConflict: "user_id,role" });
+
+    // Ensure notification preferences exist
+    await supabase.from("notification_preferences").upsert({
+      user_id: userId,
+    }, { onConflict: "user_id" });
+
+  } else {
+    // Truly new user — create auth account
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        strava_id: athlete.id,
+        display_name: `${athlete.firstname} ${athlete.lastname}`,
+        avatar_url: athlete.profile,
+      },
+    });
+
+    if (authError) {
+      console.error("Auth creation error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Failed to create user account" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Step 2: Delete rows the user CAN delete client-side
-    if (user?.id) {
-      await supabase.from("race_participants").delete().eq("user_id", user.id);
-      await supabase.from("user_training_progress").delete().eq("user_id", user.id);
-      await supabase.from("push_tokens").delete().eq("user_id", user.id);
-    }
+    userId = authData.user.id;
 
-    // Step 3: Clear Strava credentials + reset stats on profile
-    await supabase
-      .from("profiles")
-      .update({
-        strava_id: null,
-        strava_access_token: null,
-        strava_refresh_token: null,
-        strava_token_expires_at: null,
-        total_distance: 0,
-        total_runs: 0,
-        current_streak: 0,
-        longest_streak: 0,
-        last_synced_at: null,
-      })
-      .eq("user_id", user!.id);
-
-    // Step 4: Invalidate all queries
-    await queryClient.invalidateQueries({ queryKey: ["profile"] });
-    await queryClient.invalidateQueries({ queryKey: ["activities"] });
-    await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
-    await queryClient.invalidateQueries({ queryKey: ["userRank"] });
-    await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
-    await queryClient.invalidateQueries({ queryKey: ["userAchievements"] });
-
-    notificationSuccess();
-    toast.success("Strava disconnected and all data removed");
-
-    // Step 5: Sign out
-    await supabase.auth.signOut();
-    navigate("/login");
-  } catch (error: any) {
-    console.error("Disconnect error:", error);
-    toast.error(error.message || "Failed to disconnect Strava");
-    setIsDisconnecting(false);
+    await supabase.from("profiles").insert({ ... });
+    await supabase.from("user_roles").insert({ ... });
+    await supabase.from("notification_preferences").insert({ ... });
   }
-};
+}
 ```
 
-**Add AlertDialog + Disconnect button** inside the Strava Connection card, below the Force Full Sync button and its description paragraph:
+Note: `listUsers` with no filter returns all users. Since this is a closed club app with a small user base this is fine. Alternatively, a faster approach is to use the admin `getUserByEmail` equivalent — but Supabase JS admin API exposes `listUsers` with email filter via pagination. We'll use the `filter` param: `listUsers({ page: 1, perPage: 1000 })` then find by email client-side, which is reliable for a small community.
 
-```tsx
-<AlertDialog>
-  <AlertDialogTrigger asChild>
-    <Button
-      variant="outline"
-      disabled={isDisconnecting}
-      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
-    >
-      {isDisconnecting ? (
-        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-      ) : (
-        <Unlink className="w-4 h-4 mr-2" />
-      )}
-      {isDisconnecting ? "Disconnecting..." : "Disconnect Strava"}
-    </Button>
-  </AlertDialogTrigger>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Disconnect Strava?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This will permanently delete all your activity data, leaderboard entries, achievements, and race registrations from this app. Your Strava account itself will not be affected. This action cannot be undone.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction
-        onClick={handleDisconnectStrava}
-        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-      >
-        Yes, disconnect and delete data
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+### Fix 2 — Also fix the `existingProfile` branch: don't overwrite user-set display_name/avatar
+
+Currently line 149-151 always overwrites `display_name` and `avatar_url` with Strava data even when the user changed them. The previous bugfix session addressed this in `sync-strava` but the same issue exists here in `strava-auth`. Fix: only set these if the profile doesn't already have values.
+
+```ts
+// Fetch current profile first
+const { data: currentProfileData } = await supabase
+  .from("profiles")
+  .select("display_name, avatar_url")
+  .eq("user_id", userId)
+  .single();
+
+await supabase.from("profiles").update({
+  strava_access_token: access_token,
+  strava_refresh_token: refresh_token,
+  strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
+  display_name: currentProfileData?.display_name || `${athlete.firstname} ${athlete.lastname}`,
+  avatar_url: currentProfileData?.avatar_url || athlete.profile,
+  city: athlete.city || null,
+}).eq("user_id", userId);
 ```
-
----
 
 ## Files Changed
 
 | File | Change |
-|---|---|
-| `supabase/functions/disconnect-strava/index.ts` | New edge function — deletes `activities`, `monthly_leaderboard`, `user_achievements` using service role |
-| `src/pages/Settings.tsx` | Add AlertDialog + Disconnect Strava button + handler |
+|------|--------|
+| `supabase/functions/strava-auth/index.ts` | Add reconnecting-user recovery logic in the new-user branch; also protect display_name/avatar from being overwritten in the existing-user branch |
 
-No database schema changes needed. No new secrets needed — `SUPABASE_SERVICE_ROLE_KEY` is already configured. Edge function deploys automatically.
+No database changes needed. The edge function redeploys automatically.
+
+## Why this is the complete fix
+
+After this change, the full lifecycle works correctly:
+- First time connecting Strava: creates auth user + profile (same as before)
+- Disconnecting Strava: clears profile strava_id + data (same as before), auth user persists
+- Reconnecting Strava: finds existing auth user by email, upserts profile with new strava_id + tokens, generates magic link — no crash
