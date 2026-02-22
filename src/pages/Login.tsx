@@ -71,9 +71,12 @@ const Login = () => {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-center space-y-4"
           >
-            <h1 className="text-4xl font-black uppercase tracking-tight text-foreground">
+            <h1 className="text-6xl font-black uppercase tracking-tighter text-foreground leading-none">
               Run to Live.
             </h1>
+            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Erode Runners Club
+            </p>
             <p className="text-lg text-muted-foreground font-medium">
               Track your runs. Compete with the community.
             </p>
@@ -90,7 +93,7 @@ const Login = () => {
             <Button
               onClick={handleStravaLogin}
               disabled={isLoading}
-              className="w-full h-14 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-sm disabled:opacity-50 transition-all"
+              className="w-full h-16 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-sm disabled:opacity-50 transition-all"
             >
               {isLoading ? (
                 <motion.div

@@ -95,9 +95,9 @@ const Leaderboard = () => {
             {/* 1st Place */}
             <div className="flex flex-col items-center -mt-4">
               <div className="relative">
-                <Avatar className="w-18 h-18 border-2 border-primary">
+                <Avatar className="w-20 h-20 border-2 border-primary">
                   <AvatarImage src={top3[0]?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground font-bold">{top3[0]?.display_name?.[0] || "1"}</AvatarFallback>
+                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xl">{top3[0]?.display_name?.[0] || "1"}</AvatarFallback>
                 </Avatar>
                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-primary flex items-center justify-center">
                   <Trophy className="w-4 h-4 text-primary-foreground" />
@@ -106,8 +106,8 @@ const Leaderboard = () => {
               <p className="text-xs text-muted-foreground mt-2 truncate max-w-20 font-bold uppercase">
                 {top3[0]?.display_name}
               </p>
-              <div className="w-20 h-28 bg-primary mt-2 flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-primary-foreground">1</span>
+              <div className="w-24 h-32 bg-primary mt-2 flex flex-col items-center justify-center">
+                <span className="text-5xl font-black text-primary-foreground">1</span>
                 <span className="text-sm text-primary-foreground/90 font-bold">
                   {((top3[0]?.total_distance || 0) / 1000).toFixed(0)} km
                 </span>
@@ -145,7 +145,7 @@ const Leaderboard = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
               >
-                <Card className={`border-border ${isCurrentUser ? "border-primary bg-primary/5" : ""}`}>
+                <Card className={`border-border ${isCurrentUser ? "border-primary bg-primary/5 shadow-[0_0_15px_hsl(var(--primary)/0.15)]" : ""}`}>
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 flex items-center justify-center text-sm font-black

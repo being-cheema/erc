@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Unlink } from "lucide-react";
+import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Unlink, Medal, BookOpen, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 interface NotificationPreferences {
   achievements: boolean;
@@ -41,6 +42,7 @@ const Settings = () => {
   const { theme, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
   const { lightImpact, mediumImpact, selectionChanged, notificationSuccess } = useHaptics();
+  const { isAdmin } = useIsAdmin();
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -310,8 +312,8 @@ const Settings = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-            <p className="text-muted-foreground text-sm">Manage your profile</p>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Settings</h1>
+            <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Manage your profile</p>
           </div>
         </div>
       </motion.header>
@@ -556,7 +558,44 @@ const Settings = () => {
           </motion.div>
         )}
 
-        {/* Sign Out Section */}
+        {/* Quick Links */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+        >
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+            More
+          </h2>
+          <Card className="border-border/50">
+            <CardContent className="p-0">
+              <button
+                onClick={() => { lightImpact(); navigate("/achievements"); }}
+                className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors text-left"
+              >
+                <Medal className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">Achievements</span>
+              </button>
+              <button
+                onClick={() => { lightImpact(); navigate("/blog"); }}
+                className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors text-left"
+              >
+                <BookOpen className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">Blog</span>
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { lightImpact(); navigate("/admin"); }}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors text-left"
+                >
+                  <Shield className="w-5 h-5 text-primary" />
+                  <span className="font-medium text-foreground">Admin Panel</span>
+                </button>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
