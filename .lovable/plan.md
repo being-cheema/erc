@@ -1,141 +1,108 @@
 
-# Fix: "Failed to create user account" after Strava Disconnect
 
-## Root Cause (Confirmed by DB + Logs)
+# Premium UI/UX Overhaul -- Nike/Adidas-Level Athletic Design
 
-The disconnect flow correctly clears `strava_id` from the `profiles` table and signs the user out — but it does NOT delete the auth account (the row in `auth.users` with email `strava_101181627@eroderunners.local`).
+## The Problem
 
-When that user tries to reconnect Strava:
+The current UI has solid bones (dark theme, Strava orange accent, Inter font, sharp edges) but falls short of a premium athletic app in several key areas:
 
-1. `strava-auth` callback checks `profiles` for `strava_id = athlete.id` → finds nothing (cleared by disconnect)
-2. Falls into the "new user" branch
-3. Calls `supabase.auth.admin.createUser({ email: "strava_101181627@eroderunners.local" })`
-4. Crashes with `422 email_exists` → returns 500 "Failed to create user account"
+1. **Onboarding**: Stick-figure SVG illustrations look amateur -- Nike NRC uses full-bleed photography and bold typography-forward slides
+2. **Typography hierarchy is flat**: Titles are bold but not dramatically sized; no contrast between hero numbers and supporting text like Nike/Adidas apps
+3. **Onboarding description text is invisible**: Low contrast muted text barely readable on dark background (visible in the screenshot)
+4. **Bottom nav is overcrowded**: 7 items (Home, Races, Ranks, Badges, Stats, Blog, Admin) -- Nike NRC uses 4, Strava uses 5
+5. **Cards lack depth**: All cards look the same -- no visual differentiation between primary actions and secondary info
+6. **No hero moments**: Missing large, dramatic stat displays that make Nike/Adidas apps feel powerful
 
-The DB confirms exactly this:
-- `auth.users` has `strava_101181627@eroderunners.local` (auth account still alive)
-- `profiles` has `strava_id = null` for that user (cleared by disconnect)
+## Design Philosophy
 
-## Two-Part Fix
+Inspired by Nike Run Club, Adidas Running, and Strava:
+- **Typography IS the illustration** -- replace stick figures with massive, impactful type
+- **Data as hero** -- oversized numbers with thin unit labels (like Nike's "24.3 KM" display)
+- **Fewer, bolder elements** -- reduce visual noise, increase whitespace
+- **Motion with purpose** -- subtle entrance animations, not constant particle effects
 
-### Fix 1 — `strava-auth/index.ts`: Handle the "reconnecting user" case
+---
 
-In the "new user" branch (line 155), before calling `createUser`, first check if an auth user with that email already exists using `getUserByEmail`. If found, treat it as an existing user (update tokens, upsert profile) rather than trying to create a new one.
+## Changes
 
-```ts
-// NEW: Check if auth user already exists with this Strava email
-const stravaEmail = `strava_${athlete.id}@eroderunners.local`;
-const { data: existingAuthUser } = await supabase.auth.admin.listUsers();
-// More efficient: use getUserByEmail via admin API
-```
+### 1. Onboarding Redesign -- Typography-First Approach
 
-The precise fix replaces the `else` block logic:
+**File: `src/components/onboarding/OnboardingSlide.tsx`**
 
-```ts
-} else {
-  // New user OR reconnecting user (disconnected previously)
-  isNewUser = true;
-  const email = `strava_${athlete.id}@eroderunners.local`;
-  const password = crypto.randomUUID();
+Replace the RunnerIllustration component with massive typographic elements per slide:
 
-  // First, check if an auth user with this email already exists
-  // (happens when user disconnected Strava — profile cleared but auth user remains)
-  const { data: existingUsers } = await supabase.auth.admin.listUsers();
-  const existingAuthUser = existingUsers?.users?.find(u => u.email === email);
+- Slide 1 ("Track Every Mile"): Giant "TRACK" in 120px condensed uppercase with a gradient stroke, speed lines as simple CSS
+- Slide 2 ("Join Your Tribe"): Large "TRIBE" with a row of minimal avatar circles below
+- Slide 3 ("Chase Your Goals"): Oversized trophy emoji or "GOAL" with a progress bar animation
 
-  if (existingAuthUser) {
-    // Auth user exists but profile was cleared (reconnect after disconnect)
-    userId = existingAuthUser.id;
-    isNewUser = false;
+Remove the `RunnerIllustration` component import entirely. The title becomes the hero.
 
-    // Upsert the profile (re-link strava_id and update tokens)
-    await supabase.from("profiles").upsert({
-      user_id: userId,
-      strava_id: athlete.id.toString(),
-      strava_access_token: access_token,
-      strava_refresh_token: refresh_token,
-      strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
-      display_name: `${athlete.firstname} ${athlete.lastname}`,
-      avatar_url: athlete.profile,
-      city: athlete.city || null,
-    }, { onConflict: "user_id" });
+**File: `src/components/onboarding/OnboardingCarousel.tsx`**
 
-    // Ensure member role exists
-    await supabase.from("user_roles").upsert({
-      user_id: userId,
-      role: "member",
-    }, { onConflict: "user_id,role" });
+- Remove `ParticleField` -- replace with a single subtle radial gradient that shifts color per slide
+- Make the description text `text-foreground/70` instead of `text-muted-foreground` for better readability
+- Increase title size to `text-5xl` with `font-black uppercase tracking-tighter`
+- Remove the shimmer effect on the title (gimmicky)
+- Simplify background to a clean dark gradient without animated orbs
 
-    // Ensure notification preferences exist
-    await supabase.from("notification_preferences").upsert({
-      user_id: userId,
-    }, { onConflict: "user_id" });
+### 2. Streamline Bottom Navigation to 5 Items
 
-  } else {
-    // Truly new user — create auth account
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        strava_id: athlete.id,
-        display_name: `${athlete.firstname} ${athlete.lastname}`,
-        avatar_url: athlete.profile,
-      },
-    });
+**File: `src/components/layout/BottomNav.tsx`**
 
-    if (authError) {
-      console.error("Auth creation error:", authError);
-      return new Response(
-        JSON.stringify({ error: "Failed to create user account" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+Reduce from 7 to 5 core tabs:
+- Home | Races | Ranks | Stats | Profile
 
-    userId = authData.user.id;
+Move "Badges" into the Profile/Settings section. Move "Blog" into Home as a card or into a dedicated section accessible from Home. Move "Admin" to Settings (only visible to admins).
 
-    await supabase.from("profiles").insert({ ... });
-    await supabase.from("user_roles").insert({ ... });
-    await supabase.from("notification_preferences").insert({ ... });
-  }
-}
-```
+This matches Nike NRC's clean 4-5 tab pattern.
 
-Note: `listUsers` with no filter returns all users. Since this is a closed club app with a small user base this is fine. Alternatively, a faster approach is to use the admin `getUserByEmail` equivalent — but Supabase JS admin API exposes `listUsers` with email filter via pagination. We'll use the `filter` param: `listUsers({ page: 1, perPage: 1000 })` then find by email client-side, which is reliable for a small community.
+### 3. Home Page -- Hero Stat Treatment
 
-### Fix 2 — Also fix the `existingProfile` branch: don't overwrite user-set display_name/avatar
+**File: `src/pages/Home.tsx`**
 
-Currently line 149-151 always overwrites `display_name` and `avatar_url` with Strava data even when the user changed them. The previous bugfix session addressed this in `sync-strava` but the same issue exists here in `strava-auth`. Fix: only set these if the profile doesn't already have values.
+- Replace the 2-column stats grid with a single **hero stat banner**: the user's monthly distance in massive `text-6xl font-black` with "KM" in `text-lg font-medium text-muted-foreground`
+- Below it, a horizontal row of secondary stats (Rank, Streak, Runs) in smaller `text-xl` with uppercase labels
+- Increase card spacing from `space-y-4` to `space-y-6`
+- Remove the "Strava Connected" status card at the bottom (unnecessary visual noise -- user already knows)
 
-```ts
-// Fetch current profile first
-const { data: currentProfileData } = await supabase
-  .from("profiles")
-  .select("display_name, avatar_url")
-  .eq("user_id", userId)
-  .single();
+### 4. Leaderboard -- Podium Polish
 
-await supabase.from("profiles").update({
-  strava_access_token: access_token,
-  strava_refresh_token: refresh_token,
-  strava_token_expires_at: new Date(expires_at * 1000).toISOString(),
-  display_name: currentProfileData?.display_name || `${athlete.firstname} ${athlete.lastname}`,
-  avatar_url: currentProfileData?.avatar_url || athlete.profile,
-  city: athlete.city || null,
-}).eq("user_id", userId);
-```
+**File: `src/pages/Leaderboard.tsx`**
+
+- Make the 1st place podium block taller with the user's avatar larger (w-20 h-20)
+- Add a subtle gradient border glow on the current user's row
+- Use `text-5xl` for the 1st place rank number instead of `text-3xl`
+
+### 5. Login Page -- Bolder
+
+**File: `src/pages/Login.tsx`**
+
+- Increase the tagline "Run to Live." to `text-5xl` or `text-6xl`
+- Add a secondary line below in `text-sm uppercase tracking-widest text-muted-foreground`: "ERODE RUNNERS CLUB"
+- Make the Strava button slightly taller (h-16) with more prominent text
+
+### 6. Global CSS Refinements
+
+**File: `src/index.css`**
+
+- Add a utility class `.hero-stat` for oversized stat numbers: `text-6xl font-black tracking-tighter leading-none`
+- Add `.stat-label` for the small uppercase labels beside hero stats
+- Ensure dark mode description text has better contrast: bump `--muted-foreground` from `0 0% 55%` to `0 0% 65%`
+
+---
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/strava-auth/index.ts` | Add reconnecting-user recovery logic in the new-user branch; also protect display_name/avatar from being overwritten in the existing-user branch |
+| `src/components/onboarding/OnboardingSlide.tsx` | Replace illustration with typography-hero layout |
+| `src/components/onboarding/OnboardingCarousel.tsx` | Remove ParticleField, simplify backgrounds, improve text contrast |
+| `src/components/layout/BottomNav.tsx` | Reduce to 5 tabs, move Blog/Badges/Admin elsewhere |
+| `src/pages/Home.tsx` | Hero stat banner, better spacing, remove Strava status card |
+| `src/pages/Login.tsx` | Larger typography, bolder Strava button |
+| `src/pages/Leaderboard.tsx` | Larger podium treatment, current-user glow |
+| `src/index.css` | Hero stat utilities, improved muted-foreground contrast |
+| `src/pages/Settings.tsx` | Add Blog link and Achievements section (moved from nav) |
 
-No database changes needed. The edge function redeploys automatically.
+No database changes. No edge function changes. Pure frontend refinement.
 
-## Why this is the complete fix
-
-After this change, the full lifecycle works correctly:
-- First time connecting Strava: creates auth user + profile (same as before)
-- Disconnecting Strava: clears profile strava_id + data (same as before), auth user persists
-- Reconnecting Strava: finds existing auth user by email, upserts profile with new strava_id + tokens, generates magic link — no crash
