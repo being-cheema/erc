@@ -1,29 +1,18 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Calendar, BarChart3, Trophy, Medal, Shield, BookOpen } from "lucide-react";
+import { Home, Calendar, Trophy, BarChart3, User } from "lucide-react";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { useMemo } from "react";
 
-const baseNavItems = [
+const navItems = [
   { path: "/home", icon: Home, label: "Home" },
   { path: "/races", icon: Calendar, label: "Races" },
   { path: "/leaderboard", icon: Trophy, label: "Ranks" },
-  { path: "/achievements", icon: Medal, label: "Badges" },
   { path: "/stats", icon: BarChart3, label: "Stats" },
-  { path: "/blog", icon: BookOpen, label: "Blog" },
+  { path: "/settings", icon: User, label: "Profile" },
 ];
 
 const BottomNav = () => {
   const location = useLocation();
   const { lightImpact } = useHaptics();
-  const { isAdmin } = useIsAdmin();
-
-  const navItems = useMemo(() => {
-    if (isAdmin) {
-      return [...baseNavItems, { path: "/admin", icon: Shield, label: "Admin" }];
-    }
-    return baseNavItems;
-  }, [isAdmin]);
 
   const handleNavTap = () => {
     lightImpact();

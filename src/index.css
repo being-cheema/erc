@@ -80,7 +80,7 @@
     --secondary-foreground: 0 0% 85%;
 
     --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 55%;
+    --muted-foreground: 0 0% 65%;
 
     --accent: 16 100% 50%;
     --accent-foreground: 0 0% 100%;
@@ -208,6 +208,16 @@
   /* Primary glow */
   .glow-primary {
     box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+  }
+
+  /* Hero stat - oversized numbers like Nike NRC */
+  .hero-stat {
+    @apply text-6xl font-black tracking-tighter leading-none;
+  }
+
+  /* Stat label - small uppercase beside hero stats */
+  .stat-label {
+    @apply text-[10px] font-bold uppercase tracking-widest text-muted-foreground;
   }
 }
 

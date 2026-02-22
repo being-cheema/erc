@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, Trophy, Zap, Settings, Dumbbell } from "lucide-react";
+import { ChevronRight, Calendar, Zap, Settings, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
@@ -111,51 +111,52 @@ const Home = () => {
         </div>
       </motion.header>
 
-      <div className="px-5 space-y-4">
-        {/* Goal Progress */}
+      <div className="px-5 space-y-6">
+        {/* Hero Stat Banner */}
         <GoalProgress />
 
-        {/* Stats Grid */}
+        {/* Secondary Stats Row */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-2 gap-3"
+          className="flex items-center justify-between"
         >
-          {/* Rank Card */}
+          {/* Rank */}
           <div 
-            className="bg-card p-4 press-scale cursor-pointer border border-border"
+            className="flex-1 text-center press-scale cursor-pointer"
             onClick={() => handleCardTap("/leaderboard")}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Rank</p>
-                <p className="text-3xl font-black text-foreground tracking-tight">
-                  {userRank?.rank ? `#${userRank.rank}` : "—"}
-                </p>
-              </div>
-            </div>
+            <p className="stat-label">Rank</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {userRank?.rank ? `#${userRank.rank}` : "—"}
+            </p>
           </div>
 
-          {/* Streak Card */}
+          <div className="w-px h-10 bg-border" />
+
+          {/* Streak */}
           <div 
-            className="bg-card p-4 press-scale cursor-pointer border border-border"
+            className="flex-1 text-center press-scale cursor-pointer"
             onClick={() => handleCardTap("/stats")}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-success flex items-center justify-center">
-                <Zap className="w-6 h-6 text-success-foreground" />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Streak</p>
-                <p className="text-3xl font-black text-foreground tracking-tight">
-                  {currentStreak}<span className="text-sm font-bold text-muted-foreground ml-1">D</span>
-                </p>
-              </div>
-            </div>
+            <p className="stat-label">Streak</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {currentStreak}<span className="text-sm font-bold text-muted-foreground ml-0.5">D</span>
+            </p>
+          </div>
+
+          <div className="w-px h-10 bg-border" />
+
+          {/* Total Runs */}
+          <div 
+            className="flex-1 text-center press-scale cursor-pointer"
+            onClick={() => handleCardTap("/stats")}
+          >
+            <p className="stat-label">Runs</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {profile?.total_runs || 0}
+            </p>
           </div>
         </motion.div>
 
@@ -178,7 +179,7 @@ const Home = () => {
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Next Race</p>
+                  <p className="stat-label">Next Race</p>
                   <p className="text-sm font-bold text-foreground">
                     {upcomingRace 
                       ? format(new Date(upcomingRace.race_date), "MMM d")
@@ -200,7 +201,7 @@ const Home = () => {
               <div className="flex items-center gap-3">
                 <Dumbbell className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Training</p>
+                  <p className="stat-label">Training</p>
                   <p className="text-sm font-bold text-foreground">View Plans</p>
                 </div>
               </div>
@@ -208,31 +209,6 @@ const Home = () => {
             </div>
           </div>
         </motion.div>
-
-        {/* Strava Connected Status */}
-        {profile?.strava_id && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <div className="bg-card border border-primary/30 p-4">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-strava flex items-center justify-center shrink-0">
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
-                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-foreground text-sm uppercase tracking-wide">Strava Connected</h3>
-                  <p className="text-muted-foreground text-xs">
-                    Pull down to sync latest activities
-                  </p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </div>
     </div>
   );
