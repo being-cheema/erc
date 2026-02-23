@@ -1,57 +1,122 @@
 
 
-# Fix: Revert LiquidGlass and Apply It Correctly
+# Bento Grid Home Page Redesign + Light/Dark Theme Polish
 
-## Problem
+## What We're Building
 
-The `LiquidGlass` component from `liquid-glass-react` uses SVG displacement filters that require varied background content to produce a visible refraction effect. On this app's uniform dark background:
+Redesign the Home page to match the reference screenshot's **bento grid layout** with pill-shaped bar charts, activity category filters, and a friends/social widget. Both light and dark themes will be fully polished.
 
-1. **Bottom Nav is completely gone** -- the LiquidGlass wrapper makes the nav content invisible
-2. **Home page cards look unstyled** -- no glass effect visible, just plain bordered boxes
-3. **Leaderboard podium blocks** -- same issue, effect not visible
+## Changes Overview
 
-## Solution
+### 1. Home Page - Bento Grid Layout (`src/pages/Home.tsx`)
 
-Revert all `LiquidGlass` usage back to the proven `.glass-card` CSS class. The library is fundamentally incompatible with this app's dark, uniform background design. The CSS-based glassmorphism (backdrop-blur + translucent background + subtle border) already looks great and works reliably.
+Restructure the current vertical stack into a mosaic bento grid:
 
-## Changes
+- **Top row**: Two equal cards side by side
+  - Left: **Distance card** -- large hero number (e.g. "42.5 km") with a mini weekly bar chart using pill-shaped (fully rounded) bars
+  - Right: **Calories card** -- large hero number with a circular progress ring or mini chart
+- **Full-width row**: **Activity card** -- shows "This Week" with category filter pills (All, Morning, Evening) and a list of recent runs
+- **Bottom row**: Two cards
+  - Left: **Next Race** countdown card
+  - Right: **Streak / Rank** card
 
-### 1. `src/components/layout/BottomNav.tsx` -- CRITICAL FIX
-- Remove `LiquidGlass` import
-- Replace the `<LiquidGlass>` wrapper with a plain `div` using `glass-card` styling
-- Restore the nav bar visibility with `backdrop-blur-xl bg-card/80 border border-white/10` classes
+### 2. New Component: `src/components/home/BentoStatsGrid.tsx`
 
-### 2. `src/pages/Home.tsx`
-- Remove `LiquidGlass` import
-- Replace all three `<LiquidGlass>` wrappers (stats row, next race card, training card) with `div` elements using `glass-card` class
-- Restore padding via className instead of LiquidGlass `padding` prop
+A new component replacing `GoalProgress` on the Home page:
 
-### 3. `src/pages/Leaderboard.tsx`
-- Remove `LiquidGlass` import
-- Replace all three podium `<LiquidGlass>` wrappers (1st, 2nd, 3rd place) with `div` elements using `glass-card` class
+- **Distance tile**: Large number + 7-day mini bar chart with pill-shaped bars (fully rounded `radius={[999,999,999,999]}`)
+- **Calories tile**: Large number + simple visual indicator
+- Uses existing hooks (`useMonthlyDistance`, `useWeeklyStats`, `useAllTimeStats`)
 
-### 4. `src/index.css`
-- Remove the `.dark body` gradient mesh that was added specifically for LiquidGlass (it's unnecessary with CSS glass)
+### 3. New Component: `src/components/home/ActivityFeed.tsx`
 
-### 5. `package.json`
-- Keep `liquid-glass-react` installed for potential future use on pages with varied backgrounds, but it won't be actively used
+Replaces `RecentActivity` with a more polished version:
 
-## Why This Is The Right Call
+- Category filter pills at the top (All / Morning / Evening / Long Run)
+- Activity list items with distance, pace, and date
+- "View All" link to Stats page
+- Uses existing `useRecentActivities` hook
 
-The `liquid-glass-react` library works best when:
-- There's a colorful or image-based background behind the glass element
-- Content scrolls behind the glass surface (like a photo gallery)
+### 4. Updated Weekly Chart Bars (`src/components/stats/WeeklyChart.tsx`)
 
-This app has a near-uniform dark charcoal background, which means:
-- `feDisplacementMap` has nothing to distort -- result is invisible or broken
-- The existing CSS `.glass-card` (backdrop-blur + translucent bg + border) already achieves the premium glassmorphism look this design calls for
+- Change bar radius from `[4, 4, 0, 0]` to `[999, 999, 999, 999]` for the pill shape seen in the reference
 
-## Files Modified
+### 5. Light Theme Polish (`src/index.css`)
+
+The current light theme variables are basic. Updates:
+
+- **`.glass-card` light mode variant**: Instead of `hsl(0 0% 100% / 0.06)`, use `hsl(0 0% 0% / 0.03)` with `border: 1px solid hsl(0 0% 0% / 0.06)` so cards are visible on white backgrounds
+- Add a `.light .glass-card` rule so glassmorphism works in both themes
+- Light mode stat labels, card backgrounds, and borders all get proper contrast
+
+### 6. Theme Toggle Visibility (`src/pages/Settings.tsx`)
+
+Ensure the existing theme toggle on the Settings page works and is prominent so users can switch between light/dark.
+
+## Technical Details
+
+### Bento Grid CSS
+
+```text
++------------------+------------------+
+|   Distance       |   Calories       |
+|   42.5 km        |   1,250 kcal     |
+|   [bar chart]    |   [ring/chart]   |
++------------------+------------------+
+|   Recent Activity                   |
+|   [All] [Morning] [Evening]         |
+|   - Morning Run  5.2 km  5:30/km   |
+|   - Evening Jog  3.1 km  6:15/km   |
++-------------------------------------+
+|   Next Race      |   Streak & Rank  |
+|   Mar 15         |   12 Days #4     |
++------------------+------------------+
+```
+
+Uses `grid grid-cols-2 gap-3` with `col-span-2` for the activity row.
+
+### Light Mode Glass Card Fix
+
+```css
+/* Current (dark-only) */
+.glass-card {
+  background: hsl(0 0% 100% / 0.06);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+
+/* New - theme-aware */
+.glass-card {
+  @apply backdrop-blur-xl rounded-2xl;
+  background: hsl(0 0% 100% / 0.06);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+
+:root .glass-card,
+.light .glass-card {
+  background: hsl(0 0% 100% / 0.7);
+  border: 1px solid hsl(0 0% 0% / 0.08);
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+}
+```
+
+### Pill Bar Chart
+
+In all bar charts, change `radius` prop:
+```text
+Before: radius={[4, 4, 0, 0]}
+After:  radius={[999, 999, 999, 999]}
+```
+
+### Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/layout/BottomNav.tsx` | Remove LiquidGlass, restore glass-card nav |
-| `src/pages/Home.tsx` | Remove LiquidGlass, use glass-card divs |
-| `src/pages/Leaderboard.tsx` | Remove LiquidGlass, use glass-card divs |
-| `src/index.css` | Remove gradient mesh background |
+| `src/pages/Home.tsx` | Replace vertical layout with bento grid |
+| `src/components/home/BentoStatsGrid.tsx` | NEW -- Distance + Calories bento tiles with mini charts |
+| `src/components/home/ActivityFeed.tsx` | NEW -- Activity list with category filters |
+| `src/components/home/GoalProgress.tsx` | Keep as-is (used on Stats page), no longer imported in Home |
+| `src/components/home/RecentActivity.tsx` | Keep as-is, replaced by ActivityFeed on Home |
+| `src/components/stats/WeeklyChart.tsx` | Pill-shaped bars |
+| `src/index.css` | Light mode glass-card, theme-aware utilities |
+| `src/components/layout/BottomNav.tsx` | Light mode border/bg adjustments |
 
