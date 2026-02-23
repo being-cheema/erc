@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
-import LiquidGlass from "liquid-glass-react";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg
@@ -51,79 +50,70 @@ const Login = () => {
           transition={{ duration: 0.5 }}
           className="w-full max-w-sm mx-auto"
         >
-          <LiquidGlass
-            displacementScale={48}
-            blurAmount={0.1}
-            saturation={130}
-            aberrationIntensity={1.5}
-            cornerRadius={24}
-            padding="32px"
-          >
-            <div className="space-y-10">
-              {/* Logo */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="flex justify-center"
-              >
-                <img 
-                  src={logo} 
-                  alt="Erode Runners Club" 
-                  className="h-24 w-auto object-contain"
-                />
-              </motion.div>
-              
-              {/* Title */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3, duration: 0.5 }}
-                className="text-center space-y-4"
-              >
-                <h1 className="text-6xl font-black uppercase tracking-tighter text-foreground leading-none">
-                  Run to Live.
-                </h1>
-                <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-                  Erode Runners Club
-                </p>
-                <p className="text-base text-muted-foreground font-medium">
-                  Track your runs. Compete with the community.
-                </p>
-              </motion.div>
+          <div className="glass-card p-8 space-y-10">
+            {/* Logo */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="flex justify-center"
+            >
+              <img 
+                src={logo} 
+                alt="Erode Runners Club" 
+                className="h-24 w-auto object-contain"
+              />
+            </motion.div>
+            
+            {/* Title */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-center space-y-4"
+            >
+              <h1 className="text-6xl font-black uppercase tracking-tighter text-foreground leading-none">
+                Run to Live.
+              </h1>
+              <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Erode Runners Club
+              </p>
+              <p className="text-base text-muted-foreground font-medium">
+                Track your runs. Compete with the community.
+              </p>
+            </motion.div>
 
-              {/* Login Button */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="space-y-4"
+            {/* Login Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="space-y-4"
+            >
+              <Button
+                onClick={handleStravaLogin}
+                disabled={isLoading}
+                className="w-full h-16 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-xl disabled:opacity-50 transition-all"
               >
-                <Button
-                  onClick={handleStravaLogin}
-                  disabled={isLoading}
-                  className="w-full h-16 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-xl disabled:opacity-50 transition-all"
-                >
-                  {isLoading ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-5 h-5 rounded-full border-2 border-white border-t-transparent"
-                    />
-                  ) : (
-                    <>
-                      <StravaIcon />
-                      <span className="ml-2">Connect with Strava</span>
-                    </>
-                  )}
-                </Button>
+                {isLoading ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-5 h-5 rounded-full border-2 border-white border-t-transparent"
+                  />
+                ) : (
+                  <>
+                    <StravaIcon />
+                    <span className="ml-2">Connect with Strava</span>
+                  </>
+                )}
+              </Button>
 
-                <p className="text-center text-xs text-muted-foreground leading-relaxed">
-                  We sync your runs from Strava to show stats and rankings.
-                </p>
-              </motion.div>
-            </div>
-          </LiquidGlass>
+              <p className="text-center text-xs text-muted-foreground leading-relaxed">
+                We sync your runs from Strava to show stats and rankings.
+              </p>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
 
