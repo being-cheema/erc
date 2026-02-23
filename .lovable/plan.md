@@ -1,125 +1,57 @@
 
 
-# Integrate `liquid-glass-react` Library
+# Fix: Revert LiquidGlass and Apply It Correctly
 
-## What is `liquid-glass-react`?
+## Problem
 
-A React component library (npm package) that creates Apple's Liquid Glass effect using SVG filters. It provides real refraction, chromatic aberration, elastic hover, and specular highlights -- all working on the web. Currently the app uses a manual `.glass-card` CSS class (simple backdrop-blur + translucent background). This upgrade replaces that with the real liquid glass effect.
+The `LiquidGlass` component from `liquid-glass-react` uses SVG displacement filters that require varied background content to produce a visible refraction effect. On this app's uniform dark background:
 
-## Integration Strategy
+1. **Bottom Nav is completely gone** -- the LiquidGlass wrapper makes the nav content invisible
+2. **Home page cards look unstyled** -- no glass effect visible, just plain bordered boxes
+3. **Leaderboard podium blocks** -- same issue, effect not visible
 
-Install the package and apply `<LiquidGlass>` to key surfaces. Not every element needs it -- overuse would hurt performance and readability. We'll apply it to:
+## Solution
 
-- **Bottom Navigation** (always visible, high impact)
-- **Login card** (first impression)
-- **Home page stats card** (secondary stats row)
-- **Quick action cards** on Home
-- **Leaderboard podium blocks** (1st, 2nd, 3rd place)
-- **Onboarding CTA button area**
-
-Individual small elements like GoalProgress pills and activity rows will keep the lightweight `.glass-card` CSS to avoid performance overhead from dozens of SVG filters.
-
----
+Revert all `LiquidGlass` usage back to the proven `.glass-card` CSS class. The library is fundamentally incompatible with this app's dark, uniform background design. The CSS-based glassmorphism (backdrop-blur + translucent background + subtle border) already looks great and works reliably.
 
 ## Changes
 
-### 1. Install dependency
+### 1. `src/components/layout/BottomNav.tsx` -- CRITICAL FIX
+- Remove `LiquidGlass` import
+- Replace the `<LiquidGlass>` wrapper with a plain `div` using `glass-card` styling
+- Restore the nav bar visibility with `backdrop-blur-xl bg-card/80 border border-white/10` classes
 
-Add `liquid-glass-react` to `package.json`.
+### 2. `src/pages/Home.tsx`
+- Remove `LiquidGlass` import
+- Replace all three `<LiquidGlass>` wrappers (stats row, next race card, training card) with `div` elements using `glass-card` class
+- Restore padding via className instead of LiquidGlass `padding` prop
 
-### 2. Bottom Navigation -- `src/components/layout/BottomNav.tsx`
+### 3. `src/pages/Leaderboard.tsx`
+- Remove `LiquidGlass` import
+- Replace all three podium `<LiquidGlass>` wrappers (1st, 2nd, 3rd place) with `div` elements using `glass-card` class
 
-Wrap the nav container `div` with `<LiquidGlass>`:
+### 4. `src/index.css`
+- Remove the `.dark body` gradient mesh that was added specifically for LiquidGlass (it's unnecessary with CSS glass)
 
-```
-<LiquidGlass
-  displacementScale={40}
-  blurAmount={0.08}
-  saturation={120}
-  aberrationIntensity={1}
-  cornerRadius={16}
->
-  <div className="flex items-center h-16">...</div>
-</LiquidGlass>
-```
+### 5. `package.json`
+- Keep `liquid-glass-react` installed for potential future use on pages with varied backgrounds, but it won't be actively used
 
-Remove the manual `backdrop-blur-xl bg-card/80 border border-white/10` classes from the inner div since LiquidGlass handles the glass effect. Keep `rounded-2xl shadow-lg` on the outer wrapper.
+## Why This Is The Right Call
 
-### 3. Login Page -- `src/pages/Login.tsx`
+The `liquid-glass-react` library works best when:
+- There's a colorful or image-based background behind the glass element
+- Content scrolls behind the glass surface (like a photo gallery)
 
-Replace the `.glass-card` class on the login container with a `<LiquidGlass>` wrapper:
+This app has a near-uniform dark charcoal background, which means:
+- `feDisplacementMap` has nothing to distort -- result is invisible or broken
+- The existing CSS `.glass-card` (backdrop-blur + translucent bg + border) already achieves the premium glassmorphism look this design calls for
 
-```
-<LiquidGlass
-  displacementScale={48}
-  blurAmount={0.1}
-  saturation={130}
-  aberrationIntensity={1.5}
-  cornerRadius={24}
-  padding="32px"
->
-  {/* Logo, title, button content */}
-</LiquidGlass>
-```
-
-### 4. Home Page Stats Card -- `src/pages/Home.tsx`
-
-Wrap the secondary stats row (Rank / Streak / Runs) in `<LiquidGlass>` with subtle settings:
-
-```
-<LiquidGlass
-  displacementScale={32}
-  blurAmount={0.06}
-  saturation={120}
-  cornerRadius={16}
-  padding="16px"
->
-```
-
-Also wrap each quick action card (Next Race, Training) in `<LiquidGlass>` with subtle settings.
-
-### 5. Leaderboard Podium -- `src/pages/Leaderboard.tsx`
-
-Wrap the 1st place podium block in `<LiquidGlass>` with medium intensity. The 2nd and 3rd place blocks get subtle intensity. This creates a hierarchy where the winner's card has the most dramatic glass effect.
-
-### 6. Onboarding CTA -- `src/components/onboarding/OnboardingCarousel.tsx`
-
-Wrap the "Start Tracking" / "Next" button area in a `<LiquidGlass>` container with subtle settings to give the bottom action area a premium floating feel.
-
-### 7. Keep `.glass-card` CSS -- `src/index.css`
-
-The existing `.glass-card` class stays unchanged for smaller elements (GoalProgress pills, activity rows, leaderboard list cards) that don't warrant the SVG filter overhead. This is a performance-conscious approach.
-
----
-
-## Technical Details
-
-### LiquidGlass Props Used
-
-| Prop | Description | Values Used |
-|------|-------------|-------------|
-| `displacementScale` | Refraction strength | 32 (subtle), 48 (medium), 64 (strong) |
-| `blurAmount` | Background blur | 0.06-0.12 |
-| `saturation` | Color saturation boost | 120-140 |
-| `aberrationIntensity` | Chromatic aberration | 1-2 |
-| `cornerRadius` | Rounded corners | 16 (cards), 24 (login) |
-| `padding` | Inner padding | Varies per use |
-| `elasticity` | Hover liquid wobble | 0.25-0.35 |
-
-### Browser Support Note
-
-Safari and Firefox only partially support the displacement effect (the refraction won't be visible). The component falls back gracefully to a blurred glass look, which is still an improvement over the current flat CSS.
-
-### Files Modified
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `package.json` | Add `liquid-glass-react` dependency |
-| `src/components/layout/BottomNav.tsx` | Wrap nav in LiquidGlass |
-| `src/pages/Login.tsx` | Replace glass-card with LiquidGlass |
-| `src/pages/Home.tsx` | Wrap stats card and quick actions in LiquidGlass |
-| `src/pages/Leaderboard.tsx` | Wrap podium blocks in LiquidGlass |
-| `src/components/onboarding/OnboardingCarousel.tsx` | Wrap CTA area in LiquidGlass |
-
-No database changes. No edge function changes.
+| `src/components/layout/BottomNav.tsx` | Remove LiquidGlass, restore glass-card nav |
+| `src/pages/Home.tsx` | Remove LiquidGlass, use glass-card divs |
+| `src/pages/Leaderboard.tsx` | Remove LiquidGlass, use glass-card divs |
+| `src/index.css` | Remove gradient mesh background |
 
