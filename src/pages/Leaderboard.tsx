@@ -53,10 +53,10 @@ const Leaderboard = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center py-12"
         >
-          <div className="w-20 h-20 mx-auto bg-muted flex items-center justify-center mb-4">
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4">
             <Trophy className="w-10 h-10 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-bold uppercase tracking-wide text-foreground mb-2">No Rankings Yet</h2>
+          <h2 className="text-lg font-bold text-foreground mb-2">No Rankings Yet</h2>
           <p className="text-muted-foreground text-xs font-medium max-w-xs mx-auto">
             Connect Strava and start running to see club rankings.
           </p>
@@ -73,18 +73,18 @@ const Leaderboard = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex items-end justify-center gap-2 py-8"
+            className="flex items-end justify-center gap-3 py-8"
           >
             {/* 2nd Place */}
             <div className="flex flex-col items-center">
-              <Avatar className="w-14 h-14 border-2 border-muted">
+              <Avatar className="w-14 h-14 border-2 border-white/10">
                 <AvatarImage src={top3[1]?.avatar_url || undefined} />
-                <AvatarFallback className="bg-muted text-muted-foreground font-bold">{top3[1]?.display_name?.[0] || "2"}</AvatarFallback>
+                <AvatarFallback className="bg-white/5 text-muted-foreground font-bold">{top3[1]?.display_name?.[0] || "2"}</AvatarFallback>
               </Avatar>
-              <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold uppercase">
+              <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold">
                 {top3[1]?.display_name}
               </p>
-              <div className="w-18 h-20 bg-muted mt-2 flex flex-col items-center justify-center">
+              <div className="w-18 h-20 glass-card mt-2 flex flex-col items-center justify-center">
                 <span className="text-2xl font-black text-foreground">2</span>
                 <span className="text-xs text-muted-foreground font-bold">
                   {((top3[1]?.total_distance || 0) / 1000).toFixed(0)} km
@@ -95,20 +95,20 @@ const Leaderboard = () => {
             {/* 1st Place */}
             <div className="flex flex-col items-center -mt-4">
               <div className="relative">
-                <Avatar className="w-20 h-20 border-2 border-primary">
+                <Avatar className="w-20 h-20 border-2 border-primary ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
                   <AvatarImage src={top3[0]?.avatar_url || undefined} />
                   <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xl">{top3[0]?.display_name?.[0] || "1"}</AvatarFallback>
                 </Avatar>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-primary flex items-center justify-center">
+                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
                   <Trophy className="w-4 h-4 text-primary-foreground" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-2 truncate max-w-20 font-bold uppercase">
+              <p className="text-xs text-muted-foreground mt-2 truncate max-w-20 font-bold">
                 {top3[0]?.display_name}
               </p>
-              <div className="w-24 h-32 bg-primary mt-2 flex flex-col items-center justify-center">
-                <span className="text-5xl font-black text-primary-foreground">1</span>
-                <span className="text-sm text-primary-foreground/90 font-bold">
+              <div className="w-24 h-32 mt-2 rounded-2xl bg-gradient-to-b from-primary/20 to-primary/5 border border-primary/20 flex flex-col items-center justify-center">
+                <span className="text-5xl font-black text-primary">1</span>
+                <span className="text-sm text-foreground/80 font-bold">
                   {((top3[0]?.total_distance || 0) / 1000).toFixed(0)} km
                 </span>
               </div>
@@ -116,14 +116,14 @@ const Leaderboard = () => {
 
             {/* 3rd Place */}
             <div className="flex flex-col items-center">
-              <Avatar className="w-14 h-14 border-2 border-muted">
+              <Avatar className="w-14 h-14 border-2 border-white/10">
                 <AvatarImage src={top3[2]?.avatar_url || undefined} />
-                <AvatarFallback className="bg-muted text-muted-foreground font-bold">{top3[2]?.display_name?.[0] || "3"}</AvatarFallback>
+                <AvatarFallback className="bg-white/5 text-muted-foreground font-bold">{top3[2]?.display_name?.[0] || "3"}</AvatarFallback>
               </Avatar>
-              <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold uppercase">
+              <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold">
                 {top3[2]?.display_name}
               </p>
-              <div className="w-18 h-16 bg-muted/70 mt-2 flex flex-col items-center justify-center">
+              <div className="w-18 h-16 glass-card mt-2 flex flex-col items-center justify-center">
                 <span className="text-2xl font-black text-foreground">3</span>
                 <span className="text-xs text-muted-foreground font-bold">
                   {((top3[2]?.total_distance || 0) / 1000).toFixed(0)} km
@@ -145,23 +145,23 @@ const Leaderboard = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
               >
-                <Card className={`border-border ${isCurrentUser ? "border-primary bg-primary/5 shadow-[0_0_15px_hsl(var(--primary)/0.15)]" : ""}`}>
+                <Card className={`glass-card border-white/[0.08] ${isCurrentUser ? "border-primary/30 bg-primary/[0.08] shadow-[0_0_20px_hsl(var(--primary)/0.1)]" : ""}`}>
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 flex items-center justify-center text-sm font-black
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black
                         ${rank === 1 ? "bg-primary text-primary-foreground" : ""}
-                        ${rank === 2 ? "bg-muted text-foreground" : ""}
-                        ${rank === 3 ? "bg-muted/70 text-foreground" : ""}
-                        ${rank > 3 ? "bg-muted text-muted-foreground" : ""}
+                        ${rank === 2 ? "bg-white/10 text-foreground" : ""}
+                        ${rank === 3 ? "bg-white/5 text-foreground" : ""}
+                        ${rank > 3 ? "bg-white/5 text-muted-foreground" : ""}
                       `}>
                         {rank}
                       </div>
-                      <Avatar className="w-10 h-10 border border-border">
+                      <Avatar className="w-10 h-10 border border-white/10">
                         <AvatarImage src={runner.avatar_url || undefined} />
-                        <AvatarFallback className="bg-muted font-bold">{runner.display_name?.[0] || "?"}</AvatarFallback>
+                        <AvatarFallback className="bg-white/5 font-bold">{runner.display_name?.[0] || "?"}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-foreground truncate text-sm uppercase tracking-wide">{runner.display_name}</p>
+                        <p className="font-bold text-foreground truncate text-sm">{runner.display_name}</p>
                         <p className="text-muted-foreground text-xs font-medium">
                           {((runner.total_distance || 0) / 1000).toFixed(1)} km
                         </p>
@@ -191,7 +191,7 @@ const Leaderboard = () => {
   return (
     <div 
       ref={containerRef}
-      className="min-h-screen bg-background safe-area-inset-top pb-24 overflow-y-auto relative"
+      className="min-h-screen bg-background safe-area-inset-top pb-32 overflow-y-auto relative"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -209,17 +209,17 @@ const Leaderboard = () => {
         className="px-4 pt-6 pb-4"
         style={{ transform: `translateY(${pullDistance * 0.3}px)` }}
       >
-        <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Leaderboard</h1>
-        <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mt-1">Club rankings • Pull to sync</p>
+        <h1 className="text-2xl font-black tracking-tight text-foreground">Leaderboard</h1>
+        <p className="text-muted-foreground text-xs font-medium mt-1">Club rankings • Pull to sync</p>
       </motion.header>
 
       <div className="px-4">
         <Tabs defaultValue="monthly" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 h-12 p-1 bg-muted">
-            <TabsTrigger value="monthly" className="text-xs font-bold uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsList className="grid w-full grid-cols-2 mb-6 h-12 p-1 rounded-xl bg-white/5">
+            <TabsTrigger value="monthly" className="text-xs font-bold uppercase tracking-wide rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Monthly
             </TabsTrigger>
-            <TabsTrigger value="alltime" className="text-xs font-bold uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="alltime" className="text-xs font-bold uppercase tracking-wide rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               All Time
             </TabsTrigger>
           </TabsList>

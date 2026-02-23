@@ -4,7 +4,7 @@ import BottomNav from "./BottomNav";
 const AppLayout = () => {
   return (
     <div className="min-h-screen bg-background">
-      <main className="pb-20">
+      <main className="pb-28">
         <Outlet />
       </main>
       <BottomNav />
