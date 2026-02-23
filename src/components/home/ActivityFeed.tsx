@@ -81,15 +81,15 @@ const ActivityFeed = () => {
 
       {/* Activity List */}
       {filtered && filtered.length > 0 ? (
-        <div className="space-y-2">
+        <div className="divide-y divide-border">
           {filtered.map((activity) => (
             <div
               key={activity.id}
-              className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 hover:bg-secondary/80 transition-colors cursor-pointer"
+              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-secondary/30 transition-colors rounded-lg px-1"
               onClick={() => navigate("/stats")}
             >
-              <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4.5 h-4.5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">

@@ -21,7 +21,7 @@ const BottomNav = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-inset-bottom">
-      <div className="max-w-lg mx-auto rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/20 overflow-hidden backdrop-blur-xl bg-card/90 dark:bg-card/80 border border-border">
+      <div className="max-w-lg mx-auto rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 overflow-hidden backdrop-blur-xl bg-card/95 dark:bg-card/80 border border-border/80 dark:border-border">
           <div className="flex items-center h-16">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || 
@@ -38,7 +38,7 @@ const BottomNav = () => {
                     {isActive && (
                       <motion.div
                         layoutId="nav-active"
-                        className="absolute -inset-2 rounded-xl bg-primary/15"
+                        className="absolute -inset-2 rounded-xl bg-primary/20"
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}

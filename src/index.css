@@ -188,15 +188,15 @@
   /* Glassmorphism card - theme-aware */
   .glass-card {
     @apply backdrop-blur-xl rounded-2xl;
-    background: hsl(0 0% 100% / 0.7);
-    border: 1px solid hsl(0 0% 0% / 0.08);
-    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+    background: hsl(0 0% 100% / 0.75);
+    border: 1px solid hsl(0 0% 0% / 0.12);
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.06), 0 0 1px hsl(0 0% 0% / 0.08);
   }
 
   .dark .glass-card {
     background: hsl(0 0% 100% / 0.06);
-    border: 1px solid hsl(0 0% 100% / 0.08);
-    box-shadow: none;
+    border: 1px solid hsl(0 0% 100% / 0.1);
+    box-shadow: 0 2px 8px hsl(0 0% 0% / 0.2);
   }
 
   .glass-card-hover {
