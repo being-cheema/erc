@@ -145,43 +145,36 @@ const Home = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="grid grid-cols-3 gap-3"
         >
-          <div className="glass-card p-4">
-            <div className="flex items-center justify-between">
-              <div 
-                className="flex-1 text-center press-scale cursor-pointer"
-                onClick={() => handleCardTap("/leaderboard")}
-              >
-                <p className="stat-label">Rank</p>
-                <p className="text-2xl font-black text-foreground tracking-tight">
-                  {userRank?.rank ? `#${userRank.rank}` : "—"}
-                </p>
-              </div>
+          <div 
+            className="glass-card p-4 text-center press-scale cursor-pointer"
+            onClick={() => handleCardTap("/leaderboard")}
+          >
+            <p className="stat-label mb-1">Rank</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {userRank?.rank ? `#${userRank.rank}` : "—"}
+            </p>
+          </div>
 
-              <div className="w-px h-8 bg-border" />
+          <div 
+            className="glass-card p-4 text-center press-scale cursor-pointer"
+            onClick={() => handleCardTap("/stats")}
+          >
+            <p className="stat-label mb-1">Streak</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {currentStreak}<span className="text-xs font-bold text-muted-foreground ml-0.5">D</span>
+            </p>
+          </div>
 
-              <div 
-                className="flex-1 text-center press-scale cursor-pointer"
-                onClick={() => handleCardTap("/stats")}
-              >
-                <p className="stat-label">Streak</p>
-                <p className="text-2xl font-black text-foreground tracking-tight">
-                  {currentStreak}<span className="text-xs font-bold text-muted-foreground ml-0.5">D</span>
-                </p>
-              </div>
-
-              <div className="w-px h-8 bg-border" />
-
-              <div 
-                className="flex-1 text-center press-scale cursor-pointer"
-                onClick={() => handleCardTap("/stats")}
-              >
-                <p className="stat-label">Runs</p>
-                <p className="text-2xl font-black text-foreground tracking-tight">
-                  {profile?.total_runs || 0}
-                </p>
-              </div>
-            </div>
+          <div 
+            className="glass-card p-4 text-center press-scale cursor-pointer"
+            onClick={() => handleCardTap("/stats")}
+          >
+            <p className="stat-label mb-1">Runs</p>
+            <p className="text-3xl font-black text-foreground tracking-tight">
+              {profile?.total_runs || 0}
+            </p>
           </div>
         </motion.div>
 
