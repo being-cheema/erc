@@ -12,8 +12,8 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefresh from "@/components/PullToRefresh";
 import { useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
-import GoalProgress from "@/components/home/GoalProgress";
-import RecentActivity from "@/components/home/RecentActivity";
+import BentoStatsGrid from "@/components/home/BentoStatsGrid";
+import ActivityFeed from "@/components/home/ActivityFeed";
 
 
 const motivationalLines = [
@@ -106,12 +106,12 @@ const Home = () => {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/settings")}
-              className="rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5"
+              className="rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/10"
             >
               <Settings className="w-5 h-5" />
             </Button>
             <Avatar 
-              className="w-10 h-10 cursor-pointer border-2 border-white/10 rounded-full"
+              className="w-10 h-10 cursor-pointer border-2 border-border rounded-full"
               onClick={() => navigate("/settings")}
             >
               <AvatarImage src={profile?.avatar_url || undefined} />
@@ -136,11 +136,11 @@ const Home = () => {
         </p>
       </motion.div>
 
-      <div className="px-5 space-y-6">
-        {/* Goal Crusher - Horizontal Stats */}
-        <GoalProgress />
+      <div className="px-5 space-y-3">
+        {/* Bento Stats - Distance + Calories */}
+        <BentoStatsGrid />
 
-        {/* Secondary Stats Row */}
+        {/* Secondary Stats Row - Rank / Streak / Runs */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -158,7 +158,7 @@ const Home = () => {
                 </p>
               </div>
 
-              <div className="w-px h-8 bg-white/10" />
+              <div className="w-px h-8 bg-border" />
 
               <div 
                 className="flex-1 text-center press-scale cursor-pointer"
@@ -170,7 +170,7 @@ const Home = () => {
                 </p>
               </div>
 
-              <div className="w-px h-8 bg-white/10" />
+              <div className="w-px h-8 bg-border" />
 
               <div 
                 className="flex-1 text-center press-scale cursor-pointer"
@@ -185,10 +185,10 @@ const Home = () => {
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
-        <RecentActivity />
+        {/* Activity Feed with category filters */}
+        <ActivityFeed />
 
-        {/* Quick Actions Row */}
+        {/* Quick Actions Row - Next Race + Training */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

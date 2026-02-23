@@ -185,11 +185,18 @@
     background-color: hsl(16 100% 42%);
   }
 
-  /* Glassmorphism card */
+  /* Glassmorphism card - theme-aware */
   .glass-card {
     @apply backdrop-blur-xl rounded-2xl;
+    background: hsl(0 0% 100% / 0.7);
+    border: 1px solid hsl(0 0% 0% / 0.08);
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+  }
+
+  .dark .glass-card {
     background: hsl(0 0% 100% / 0.06);
     border: 1px solid hsl(0 0% 100% / 0.08);
+    box-shadow: none;
   }
 
   .glass-card-hover {
@@ -197,6 +204,11 @@
   }
 
   .glass-card-hover:hover {
+    background: hsl(0 0% 100% / 0.85);
+    border-color: hsl(0 0% 0% / 0.12);
+  }
+
+  .dark .glass-card-hover:hover {
     background: hsl(0 0% 100% / 0.1);
     border-color: hsl(0 0% 100% / 0.14);
   }

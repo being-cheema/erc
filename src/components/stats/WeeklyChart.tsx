@@ -56,7 +56,7 @@ const WeeklyChart = () => {
                 <Bar 
                   dataKey="distance" 
                   fill="hsl(var(--primary))" 
-                  radius={[4, 4, 0, 0]}
+                  radius={[999, 999, 999, 999]}
                   maxBarSize={40}
                 />
               </BarChart>
