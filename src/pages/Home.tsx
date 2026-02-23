@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import GoalProgress from "@/components/home/GoalProgress";
 import RecentActivity from "@/components/home/RecentActivity";
-import LiquidGlass from "liquid-glass-react";
+
 
 const motivationalLines = [
   { regular: "Keep pushing", bold: "your limits." },
@@ -146,13 +146,7 @@ const Home = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <LiquidGlass
-            displacementScale={32}
-            blurAmount={0.06}
-            saturation={120}
-            cornerRadius={16}
-            padding="16px"
-          >
+          <div className="glass-card p-4">
             <div className="flex items-center justify-between">
               <div 
                 className="flex-1 text-center press-scale cursor-pointer"
@@ -188,7 +182,7 @@ const Home = () => {
                 </p>
               </div>
             </div>
-          </LiquidGlass>
+          </div>
         </motion.div>
 
         {/* Recent Activity */}
@@ -205,13 +199,7 @@ const Home = () => {
             className="press-scale cursor-pointer"
             onClick={() => handleCardTap("/races")}
           >
-            <LiquidGlass
-              displacementScale={32}
-              blurAmount={0.06}
-              saturation={120}
-              cornerRadius={16}
-              padding="16px"
-            >
+            <div className="glass-card p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
@@ -229,20 +217,14 @@ const Home = () => {
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
-            </LiquidGlass>
+            </div>
           </div>
 
           <div 
             className="press-scale cursor-pointer"
             onClick={() => handleCardTap("/training")}
           >
-            <LiquidGlass
-              displacementScale={32}
-              blurAmount={0.06}
-              saturation={120}
-              cornerRadius={16}
-              padding="16px"
-            >
+            <div className="glass-card p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
@@ -255,7 +237,7 @@ const Home = () => {
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
-            </LiquidGlass>
+            </div>
           </div>
         </motion.div>
       </div>

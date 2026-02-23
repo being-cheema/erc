@@ -2,7 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Home, Calendar, Trophy, BarChart3, User } from "lucide-react";
 import { useHaptics } from "@/hooks/useHaptics";
 import { motion } from "framer-motion";
-import LiquidGlass from "liquid-glass-react";
 
 const navItems = [
   { path: "/home", icon: Home, label: "Home" },
@@ -22,14 +21,7 @@ const BottomNav = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-inset-bottom">
-      <div className="max-w-lg mx-auto rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
-        <LiquidGlass
-          displacementScale={40}
-          blurAmount={0.08}
-          saturation={120}
-          aberrationIntensity={1}
-          cornerRadius={16}
-        >
+      <div className="max-w-lg mx-auto rounded-2xl shadow-lg shadow-black/20 overflow-hidden backdrop-blur-xl bg-card/80 border border-white/10">
           <div className="flex items-center h-16">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || 
@@ -70,7 +62,6 @@ const BottomNav = () => {
               );
             })}
           </div>
-        </LiquidGlass>
       </div>
     </nav>
   );

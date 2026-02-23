@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Trophy, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
-import LiquidGlass from "liquid-glass-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -85,19 +84,12 @@ const Leaderboard = () => {
               <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold">
                 {top3[1]?.display_name}
               </p>
-              <LiquidGlass
-                displacementScale={32}
-                blurAmount={0.06}
-                saturation={120}
-                cornerRadius={16}
-              >
-                <div className="w-18 h-20 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-foreground">2</span>
-                  <span className="text-xs text-muted-foreground font-bold">
-                    {((top3[1]?.total_distance || 0) / 1000).toFixed(0)} km
-                  </span>
-                </div>
-              </LiquidGlass>
+              <div className="glass-card w-18 h-20 flex flex-col items-center justify-center">
+                <span className="text-2xl font-black text-foreground">2</span>
+                <span className="text-xs text-muted-foreground font-bold">
+                  {((top3[1]?.total_distance || 0) / 1000).toFixed(0)} km
+                </span>
+              </div>
             </div>
 
             {/* 1st Place */}
@@ -114,20 +106,12 @@ const Leaderboard = () => {
               <p className="text-xs text-muted-foreground mt-2 truncate max-w-20 font-bold">
                 {top3[0]?.display_name}
               </p>
-              <LiquidGlass
-                displacementScale={48}
-                blurAmount={0.08}
-                saturation={130}
-                aberrationIntensity={1.5}
-                cornerRadius={16}
-              >
-                <div className="w-24 h-32 flex flex-col items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
-                  <span className="text-5xl font-black text-primary">1</span>
-                  <span className="text-sm text-foreground/80 font-bold">
-                    {((top3[0]?.total_distance || 0) / 1000).toFixed(0)} km
-                  </span>
-                </div>
-              </LiquidGlass>
+              <div className="glass-card w-24 h-32 flex flex-col items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
+                <span className="text-5xl font-black text-primary">1</span>
+                <span className="text-sm text-foreground/80 font-bold">
+                  {((top3[0]?.total_distance || 0) / 1000).toFixed(0)} km
+                </span>
+              </div>
             </div>
 
             {/* 3rd Place */}
@@ -139,19 +123,12 @@ const Leaderboard = () => {
               <p className="text-xs text-muted-foreground mt-2 truncate max-w-16 font-bold">
                 {top3[2]?.display_name}
               </p>
-              <LiquidGlass
-                displacementScale={32}
-                blurAmount={0.06}
-                saturation={120}
-                cornerRadius={16}
-              >
-                <div className="w-18 h-16 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-foreground">3</span>
-                  <span className="text-xs text-muted-foreground font-bold">
-                    {((top3[2]?.total_distance || 0) / 1000).toFixed(0)} km
-                  </span>
-                </div>
-              </LiquidGlass>
+              <div className="glass-card w-18 h-16 flex flex-col items-center justify-center">
+                <span className="text-2xl font-black text-foreground">3</span>
+                <span className="text-xs text-muted-foreground font-bold">
+                  {((top3[2]?.total_distance || 0) / 1000).toFixed(0)} km
+                </span>
+              </div>
             </div>
           </motion.div>
         )}
