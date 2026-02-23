@@ -1,108 +1,127 @@
 
 
-# Premium UI/UX Overhaul -- Nike/Adidas-Level Athletic Design
+# Glassmorphism Athletic UI Overhaul -- Behance-Inspired Design
 
-## The Problem
+## What We're Adapting from the Behance Design
 
-The current UI has solid bones (dark theme, Strava orange accent, Inter font, sharp edges) but falls short of a premium athletic app in several key areas:
+Key patterns visible in the "All Screen Preview" screenshot:
 
-1. **Onboarding**: Stick-figure SVG illustrations look amateur -- Nike NRC uses full-bleed photography and bold typography-forward slides
-2. **Typography hierarchy is flat**: Titles are bold but not dramatically sized; no contrast between hero numbers and supporting text like Nike/Adidas apps
-3. **Onboarding description text is invisible**: Low contrast muted text barely readable on dark background (visible in the screenshot)
-4. **Bottom nav is overcrowded**: 7 items (Home, Races, Ranks, Badges, Stats, Blog, Admin) -- Nike NRC uses 4, Strava uses 5
-5. **Cards lack depth**: All cards look the same -- no visual differentiation between primary actions and secondary info
-6. **No hero moments**: Missing large, dramatic stat displays that make Nike/Adidas apps feel powerful
-
-## Design Philosophy
-
-Inspired by Nike Run Club, Adidas Running, and Strava:
-- **Typography IS the illustration** -- replace stick figures with massive, impactful type
-- **Data as hero** -- oversized numbers with thin unit labels (like Nike's "24.3 KM" display)
-- **Fewer, bolder elements** -- reduce visual noise, increase whitespace
-- **Motion with purpose** -- subtle entrance animations, not constant particle effects
+1. **Glassmorphism cards**: Translucent frosted-glass backgrounds with soft white/10 borders and large rounded corners (currently: solid dark cards with sharp edges)
+2. **Floating pill bottom nav**: Detached from screen edges with rounded shape, active tab shows label + filled circle indicator (currently: flat bar flush to edges)
+3. **Greeting + motivational headline**: "Hello, Jacob" with italic mixed-weight "Preparing for **the big move.**" (currently: standard greeting with no motivational copy)
+4. **Goal Crusher horizontal scroll**: Stat cards ("Dis.Week 42.2 km", "Streak 7 Days") with small circular progress/emoji indicators, scrollable horizontally (currently: vertical stat blocks)
+5. **Rounded activity rows**: Each activity in a rounded glass card with a circular icon on left, name+date, and distance on right (currently: square rows with sharp edges)
+6. **Onboarding slide**: "You're in Good Company!" with runner silhouettes, "Start Tracking" button (currently: giant typography hero words)
+7. **Warm charcoal palette**: Background is a dark gray (~10% lightness), not pure black (4%), with softer contrast
+8. **Search bar on home**: Rounded search input below the motivational text
 
 ---
 
-## Changes
+## Changes by File
 
-### 1. Onboarding Redesign -- Typography-First Approach
+### 1. Global Theme Shift -- `src/index.css`
 
-**File: `src/components/onboarding/OnboardingSlide.tsx`**
+- Dark background: `0 0% 4%` to `220 6% 10%` (warm charcoal)
+- Card background: `0 0% 7%` to `220 6% 14%` with reduced opacity
+- Border: `0 0% 16%` to `0 0% 20%` (slightly more visible)
+- Radius: `0.25rem` to `1rem` (large rounded corners everywhere)
+- Muted foreground: `0 0% 65%` to `0 0% 70%` (better readability)
+- New `.glass-card` utility: `backdrop-blur-xl bg-white/[0.06] border border-white/[0.08] rounded-2xl`
+- New `.glass-card-hover` for interactive glass cards
+- Update `.athletic-card` to use rounded-2xl instead of rounded-sm
+- Update `.progress-athletic` to use rounded-full
 
-Replace the RunnerIllustration component with massive typographic elements per slide:
+### 2. Floating Pill Bottom Nav -- `src/components/layout/BottomNav.tsx`
 
-- Slide 1 ("Track Every Mile"): Giant "TRACK" in 120px condensed uppercase with a gradient stroke, speed lines as simple CSS
-- Slide 2 ("Join Your Tribe"): Large "TRIBE" with a row of minimal avatar circles below
-- Slide 3 ("Chase Your Goals"): Oversized trophy emoji or "GOAL" with a progress bar animation
+Matching the Behance nav exactly:
+- Detach from edges: `mx-4 mb-4` margin
+- Pill shape: `rounded-2xl`
+- Glassmorphism: `backdrop-blur-xl bg-card/80 border border-white/10`
+- Shadow: `shadow-lg shadow-black/20`
+- Active tab: show label text below icon; inactive tabs: icon only (no label)
+- Active indicator: filled circle behind icon instead of top dot
+- Remove top border, add shadow instead
 
-Remove the `RunnerIllustration` component import entirely. The title becomes the hero.
+### 3. Layout Padding -- `src/components/layout/AppLayout.tsx`
 
-**File: `src/components/onboarding/OnboardingCarousel.tsx`**
+- Increase `pb-20` to `pb-28` to accommodate the floating nav with margin
 
-- Remove `ParticleField` -- replace with a single subtle radial gradient that shifts color per slide
-- Make the description text `text-foreground/70` instead of `text-muted-foreground` for better readability
-- Increase title size to `text-5xl` with `font-black uppercase tracking-tighter`
-- Remove the shimmer effect on the title (gimmicky)
-- Simplify background to a clean dark gradient without animated orbs
+### 4. Home Page Redesign -- `src/pages/Home.tsx`
 
-### 2. Streamline Bottom Navigation to 5 Items
+Matching the Behance "Home" screen:
+- **Greeting**: Keep "Hello, [Name]" but add motivational mixed-weight text below: "Keep pushing" in regular weight, "**your limits.**" in bold italic -- dynamic based on user data (streak, goal progress)
+- **Goal Crusher section**: Change GoalProgress + secondary stats into a horizontal scrollable row of glass stat cards (like the "Dis.Week 42.2 km", "Streak 7 Days", "Runs 24" cards in the screenshot)
+- **Recent Activities header**: Add "View all" link on the right (matching Behance)
+- **Quick action cards**: Apply glass-card styling with rounded-2xl
+- Apply glass-card styling to all card containers
 
-**File: `src/components/layout/BottomNav.tsx`**
+### 5. Goal Progress Component -- `src/components/home/GoalProgress.tsx`
 
-Reduce from 7 to 5 core tabs:
-- Home | Races | Ranks | Stats | Profile
+- Convert from a single large card to a horizontal scrollable "Goal Crusher" row
+- Each stat as a small glass pill card (~120px wide) with:
+  - Small circular progress indicator or emoji
+  - Stat label on top ("Dis.Week", "Streak", "Active")
+  - Large value below ("42.2 km", "7 Days")
+- Use horizontal scroll with `overflow-x-auto scrollbar-hide`
+- Apply glass-card styling to each pill
 
-Move "Badges" into the Profile/Settings section. Move "Blog" into Home as a card or into a dedicated section accessible from Home. Move "Admin" to Settings (only visible to admins).
+### 6. Recent Activity Component -- `src/components/home/RecentActivity.tsx`
 
-This matches Nike NRC's clean 4-5 tab pattern.
+- Container: glass-card styling
+- Each activity row: rounded-2xl glass sub-card (not square bg-secondary/50)
+- Icon: circular background (`rounded-full`) with activity icon inside
+- Keep distance on the right side
+- Add "View all" text-button in header
 
-### 3. Home Page -- Hero Stat Treatment
+### 7. Leaderboard -- `src/pages/Leaderboard.tsx`
 
-**File: `src/pages/Home.tsx`**
+- Podium blocks: rounded-2xl glass cards instead of square blocks
+- 1st place: gradient border glow effect
+- Runner list cards: glass-card styling with rounded-2xl
+- Current user row: softer glow with glass border
+- Tab triggers: rounded-xl pill style
 
-- Replace the 2-column stats grid with a single **hero stat banner**: the user's monthly distance in massive `text-6xl font-black` with "KM" in `text-lg font-medium text-muted-foreground`
-- Below it, a horizontal row of secondary stats (Rank, Streak, Runs) in smaller `text-xl` with uppercase labels
-- Increase card spacing from `space-y-4` to `space-y-6`
-- Remove the "Strava Connected" status card at the bottom (unnecessary visual noise -- user already knows)
+### 8. Login Page -- `src/pages/Login.tsx`
 
-### 4. Leaderboard -- Podium Polish
+- Wrap content in a glass-card container with rounded-3xl
+- Strava button: rounded-xl instead of rounded-sm
+- Keep existing typography improvements
 
-**File: `src/pages/Leaderboard.tsx`**
+### 9. Onboarding -- `src/components/onboarding/OnboardingSlide.tsx` and `OnboardingCarousel.tsx`
 
-- Make the 1st place podium block taller with the user's avatar larger (w-20 h-20)
-- Add a subtle gradient border glow on the current user's row
-- Use `text-5xl` for the 1st place rank number instead of `text-3xl`
+- Last slide: Change from "GOAL" hero word to "You're in Good Company!" style messaging (matching Behance bottom-right screen)
+- Buttons: rounded-full pill shape instead of sharp
+- Softer glow effects on hero words
+- "Get Started" button becomes "Start Tracking" (matching Behance)
 
-### 5. Login Page -- Bolder
+### 10. Card Component -- `src/components/ui/card.tsx`
 
-**File: `src/pages/Login.tsx`**
+- Update default Card class from `rounded-sm` to `rounded-2xl` to match the global rounded aesthetic
 
-- Increase the tagline "Run to Live." to `text-5xl` or `text-6xl`
-- Add a secondary line below in `text-sm uppercase tracking-widest text-muted-foreground`: "ERODE RUNNERS CLUB"
-- Make the Strava button slightly taller (h-16) with more prominent text
+### 11. Tailwind Config -- `tailwind.config.ts`
 
-### 6. Global CSS Refinements
-
-**File: `src/index.css`**
-
-- Add a utility class `.hero-stat` for oversized stat numbers: `text-6xl font-black tracking-tighter leading-none`
-- Add `.stat-label` for the small uppercase labels beside hero stats
-- Ensure dark mode description text has better contrast: bump `--muted-foreground` from `0 0% 55%` to `0 0% 65%`
+- Ensure `borderRadius` values include `2xl` and `3xl` references properly
 
 ---
 
-## Files Changed
+## Technical Details
 
-| File | Change |
-|------|--------|
-| `src/components/onboarding/OnboardingSlide.tsx` | Replace illustration with typography-hero layout |
-| `src/components/onboarding/OnboardingCarousel.tsx` | Remove ParticleField, simplify backgrounds, improve text contrast |
-| `src/components/layout/BottomNav.tsx` | Reduce to 5 tabs, move Blog/Badges/Admin elsewhere |
-| `src/pages/Home.tsx` | Hero stat banner, better spacing, remove Strava status card |
-| `src/pages/Login.tsx` | Larger typography, bolder Strava button |
-| `src/pages/Leaderboard.tsx` | Larger podium treatment, current-user glow |
-| `src/index.css` | Hero stat utilities, improved muted-foreground contrast |
-| `src/pages/Settings.tsx` | Add Blog link and Achievements section (moved from nav) |
+### Files Modified
 
-No database changes. No edge function changes. Pure frontend refinement.
+| File | Change Summary |
+|------|---------------|
+| `src/index.css` | Warm charcoal background, larger radius, glass-card utilities, improved contrast |
+| `tailwind.config.ts` | Border radius values if needed |
+| `src/components/ui/card.tsx` | `rounded-sm` to `rounded-2xl` |
+| `src/components/layout/BottomNav.tsx` | Floating pill nav with glassmorphism, icon-only inactive tabs |
+| `src/components/layout/AppLayout.tsx` | Increased bottom padding for floating nav |
+| `src/pages/Home.tsx` | Motivational greeting, horizontal Goal Crusher section, glass styling |
+| `src/components/home/GoalProgress.tsx` | Horizontal scrollable stat pills with glass styling |
+| `src/components/home/RecentActivity.tsx` | Rounded glass activity rows, "View all" link |
+| `src/pages/Leaderboard.tsx` | Glass podium cards, rounded list items, pill tabs |
+| `src/pages/Login.tsx` | Glass container wrapper, rounded button |
+| `src/components/onboarding/OnboardingSlide.tsx` | Softer glow, last-slide messaging update |
+| `src/components/onboarding/OnboardingCarousel.tsx` | Pill-shaped buttons, "Start Tracking" CTA |
+
+No database or backend changes needed. Pure frontend visual refinement.
 
