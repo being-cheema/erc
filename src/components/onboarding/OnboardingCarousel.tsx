@@ -213,7 +213,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
           >
             <Button
               onClick={nextSlide}
-              className={`w-full h-14 text-base font-semibold border-0 text-white transition-all duration-300 ${
+              className={`w-full h-14 text-base font-semibold border-0 text-white rounded-full transition-all duration-300 ${
                 isLastSlide 
                   ? "bg-strava hover:bg-strava-dark shadow-lg"
                   : "gradient-primary hover:opacity-90 shadow-lg"
@@ -222,7 +222,7 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
               {isLastSlide ? (
                 <span className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
-                  Get Started
+                  Start Tracking
                 </span>
               ) : (
                 <>
