@@ -1,127 +1,125 @@
 
 
-# Glassmorphism Athletic UI Overhaul -- Behance-Inspired Design
+# Integrate `liquid-glass-react` Library
 
-## What We're Adapting from the Behance Design
+## What is `liquid-glass-react`?
 
-Key patterns visible in the "All Screen Preview" screenshot:
+A React component library (npm package) that creates Apple's Liquid Glass effect using SVG filters. It provides real refraction, chromatic aberration, elastic hover, and specular highlights -- all working on the web. Currently the app uses a manual `.glass-card` CSS class (simple backdrop-blur + translucent background). This upgrade replaces that with the real liquid glass effect.
 
-1. **Glassmorphism cards**: Translucent frosted-glass backgrounds with soft white/10 borders and large rounded corners (currently: solid dark cards with sharp edges)
-2. **Floating pill bottom nav**: Detached from screen edges with rounded shape, active tab shows label + filled circle indicator (currently: flat bar flush to edges)
-3. **Greeting + motivational headline**: "Hello, Jacob" with italic mixed-weight "Preparing for **the big move.**" (currently: standard greeting with no motivational copy)
-4. **Goal Crusher horizontal scroll**: Stat cards ("Dis.Week 42.2 km", "Streak 7 Days") with small circular progress/emoji indicators, scrollable horizontally (currently: vertical stat blocks)
-5. **Rounded activity rows**: Each activity in a rounded glass card with a circular icon on left, name+date, and distance on right (currently: square rows with sharp edges)
-6. **Onboarding slide**: "You're in Good Company!" with runner silhouettes, "Start Tracking" button (currently: giant typography hero words)
-7. **Warm charcoal palette**: Background is a dark gray (~10% lightness), not pure black (4%), with softer contrast
-8. **Search bar on home**: Rounded search input below the motivational text
+## Integration Strategy
+
+Install the package and apply `<LiquidGlass>` to key surfaces. Not every element needs it -- overuse would hurt performance and readability. We'll apply it to:
+
+- **Bottom Navigation** (always visible, high impact)
+- **Login card** (first impression)
+- **Home page stats card** (secondary stats row)
+- **Quick action cards** on Home
+- **Leaderboard podium blocks** (1st, 2nd, 3rd place)
+- **Onboarding CTA button area**
+
+Individual small elements like GoalProgress pills and activity rows will keep the lightweight `.glass-card` CSS to avoid performance overhead from dozens of SVG filters.
 
 ---
 
-## Changes by File
+## Changes
 
-### 1. Global Theme Shift -- `src/index.css`
+### 1. Install dependency
 
-- Dark background: `0 0% 4%` to `220 6% 10%` (warm charcoal)
-- Card background: `0 0% 7%` to `220 6% 14%` with reduced opacity
-- Border: `0 0% 16%` to `0 0% 20%` (slightly more visible)
-- Radius: `0.25rem` to `1rem` (large rounded corners everywhere)
-- Muted foreground: `0 0% 65%` to `0 0% 70%` (better readability)
-- New `.glass-card` utility: `backdrop-blur-xl bg-white/[0.06] border border-white/[0.08] rounded-2xl`
-- New `.glass-card-hover` for interactive glass cards
-- Update `.athletic-card` to use rounded-2xl instead of rounded-sm
-- Update `.progress-athletic` to use rounded-full
+Add `liquid-glass-react` to `package.json`.
 
-### 2. Floating Pill Bottom Nav -- `src/components/layout/BottomNav.tsx`
+### 2. Bottom Navigation -- `src/components/layout/BottomNav.tsx`
 
-Matching the Behance nav exactly:
-- Detach from edges: `mx-4 mb-4` margin
-- Pill shape: `rounded-2xl`
-- Glassmorphism: `backdrop-blur-xl bg-card/80 border border-white/10`
-- Shadow: `shadow-lg shadow-black/20`
-- Active tab: show label text below icon; inactive tabs: icon only (no label)
-- Active indicator: filled circle behind icon instead of top dot
-- Remove top border, add shadow instead
+Wrap the nav container `div` with `<LiquidGlass>`:
 
-### 3. Layout Padding -- `src/components/layout/AppLayout.tsx`
+```
+<LiquidGlass
+  displacementScale={40}
+  blurAmount={0.08}
+  saturation={120}
+  aberrationIntensity={1}
+  cornerRadius={16}
+>
+  <div className="flex items-center h-16">...</div>
+</LiquidGlass>
+```
 
-- Increase `pb-20` to `pb-28` to accommodate the floating nav with margin
+Remove the manual `backdrop-blur-xl bg-card/80 border border-white/10` classes from the inner div since LiquidGlass handles the glass effect. Keep `rounded-2xl shadow-lg` on the outer wrapper.
 
-### 4. Home Page Redesign -- `src/pages/Home.tsx`
+### 3. Login Page -- `src/pages/Login.tsx`
 
-Matching the Behance "Home" screen:
-- **Greeting**: Keep "Hello, [Name]" but add motivational mixed-weight text below: "Keep pushing" in regular weight, "**your limits.**" in bold italic -- dynamic based on user data (streak, goal progress)
-- **Goal Crusher section**: Change GoalProgress + secondary stats into a horizontal scrollable row of glass stat cards (like the "Dis.Week 42.2 km", "Streak 7 Days", "Runs 24" cards in the screenshot)
-- **Recent Activities header**: Add "View all" link on the right (matching Behance)
-- **Quick action cards**: Apply glass-card styling with rounded-2xl
-- Apply glass-card styling to all card containers
+Replace the `.glass-card` class on the login container with a `<LiquidGlass>` wrapper:
 
-### 5. Goal Progress Component -- `src/components/home/GoalProgress.tsx`
+```
+<LiquidGlass
+  displacementScale={48}
+  blurAmount={0.1}
+  saturation={130}
+  aberrationIntensity={1.5}
+  cornerRadius={24}
+  padding="32px"
+>
+  {/* Logo, title, button content */}
+</LiquidGlass>
+```
 
-- Convert from a single large card to a horizontal scrollable "Goal Crusher" row
-- Each stat as a small glass pill card (~120px wide) with:
-  - Small circular progress indicator or emoji
-  - Stat label on top ("Dis.Week", "Streak", "Active")
-  - Large value below ("42.2 km", "7 Days")
-- Use horizontal scroll with `overflow-x-auto scrollbar-hide`
-- Apply glass-card styling to each pill
+### 4. Home Page Stats Card -- `src/pages/Home.tsx`
 
-### 6. Recent Activity Component -- `src/components/home/RecentActivity.tsx`
+Wrap the secondary stats row (Rank / Streak / Runs) in `<LiquidGlass>` with subtle settings:
 
-- Container: glass-card styling
-- Each activity row: rounded-2xl glass sub-card (not square bg-secondary/50)
-- Icon: circular background (`rounded-full`) with activity icon inside
-- Keep distance on the right side
-- Add "View all" text-button in header
+```
+<LiquidGlass
+  displacementScale={32}
+  blurAmount={0.06}
+  saturation={120}
+  cornerRadius={16}
+  padding="16px"
+>
+```
 
-### 7. Leaderboard -- `src/pages/Leaderboard.tsx`
+Also wrap each quick action card (Next Race, Training) in `<LiquidGlass>` with subtle settings.
 
-- Podium blocks: rounded-2xl glass cards instead of square blocks
-- 1st place: gradient border glow effect
-- Runner list cards: glass-card styling with rounded-2xl
-- Current user row: softer glow with glass border
-- Tab triggers: rounded-xl pill style
+### 5. Leaderboard Podium -- `src/pages/Leaderboard.tsx`
 
-### 8. Login Page -- `src/pages/Login.tsx`
+Wrap the 1st place podium block in `<LiquidGlass>` with medium intensity. The 2nd and 3rd place blocks get subtle intensity. This creates a hierarchy where the winner's card has the most dramatic glass effect.
 
-- Wrap content in a glass-card container with rounded-3xl
-- Strava button: rounded-xl instead of rounded-sm
-- Keep existing typography improvements
+### 6. Onboarding CTA -- `src/components/onboarding/OnboardingCarousel.tsx`
 
-### 9. Onboarding -- `src/components/onboarding/OnboardingSlide.tsx` and `OnboardingCarousel.tsx`
+Wrap the "Start Tracking" / "Next" button area in a `<LiquidGlass>` container with subtle settings to give the bottom action area a premium floating feel.
 
-- Last slide: Change from "GOAL" hero word to "You're in Good Company!" style messaging (matching Behance bottom-right screen)
-- Buttons: rounded-full pill shape instead of sharp
-- Softer glow effects on hero words
-- "Get Started" button becomes "Start Tracking" (matching Behance)
+### 7. Keep `.glass-card` CSS -- `src/index.css`
 
-### 10. Card Component -- `src/components/ui/card.tsx`
-
-- Update default Card class from `rounded-sm` to `rounded-2xl` to match the global rounded aesthetic
-
-### 11. Tailwind Config -- `tailwind.config.ts`
-
-- Ensure `borderRadius` values include `2xl` and `3xl` references properly
+The existing `.glass-card` class stays unchanged for smaller elements (GoalProgress pills, activity rows, leaderboard list cards) that don't warrant the SVG filter overhead. This is a performance-conscious approach.
 
 ---
 
 ## Technical Details
 
+### LiquidGlass Props Used
+
+| Prop | Description | Values Used |
+|------|-------------|-------------|
+| `displacementScale` | Refraction strength | 32 (subtle), 48 (medium), 64 (strong) |
+| `blurAmount` | Background blur | 0.06-0.12 |
+| `saturation` | Color saturation boost | 120-140 |
+| `aberrationIntensity` | Chromatic aberration | 1-2 |
+| `cornerRadius` | Rounded corners | 16 (cards), 24 (login) |
+| `padding` | Inner padding | Varies per use |
+| `elasticity` | Hover liquid wobble | 0.25-0.35 |
+
+### Browser Support Note
+
+Safari and Firefox only partially support the displacement effect (the refraction won't be visible). The component falls back gracefully to a blurred glass look, which is still an improvement over the current flat CSS.
+
 ### Files Modified
 
-| File | Change Summary |
-|------|---------------|
-| `src/index.css` | Warm charcoal background, larger radius, glass-card utilities, improved contrast |
-| `tailwind.config.ts` | Border radius values if needed |
-| `src/components/ui/card.tsx` | `rounded-sm` to `rounded-2xl` |
-| `src/components/layout/BottomNav.tsx` | Floating pill nav with glassmorphism, icon-only inactive tabs |
-| `src/components/layout/AppLayout.tsx` | Increased bottom padding for floating nav |
-| `src/pages/Home.tsx` | Motivational greeting, horizontal Goal Crusher section, glass styling |
-| `src/components/home/GoalProgress.tsx` | Horizontal scrollable stat pills with glass styling |
-| `src/components/home/RecentActivity.tsx` | Rounded glass activity rows, "View all" link |
-| `src/pages/Leaderboard.tsx` | Glass podium cards, rounded list items, pill tabs |
-| `src/pages/Login.tsx` | Glass container wrapper, rounded button |
-| `src/components/onboarding/OnboardingSlide.tsx` | Softer glow, last-slide messaging update |
-| `src/components/onboarding/OnboardingCarousel.tsx` | Pill-shaped buttons, "Start Tracking" CTA |
+| File | Change |
+|------|--------|
+| `package.json` | Add `liquid-glass-react` dependency |
+| `src/components/layout/BottomNav.tsx` | Wrap nav in LiquidGlass |
+| `src/pages/Login.tsx` | Replace glass-card with LiquidGlass |
+| `src/pages/Home.tsx` | Wrap stats card and quick actions in LiquidGlass |
+| `src/pages/Leaderboard.tsx` | Wrap podium blocks in LiquidGlass |
+| `src/components/onboarding/OnboardingCarousel.tsx` | Wrap CTA area in LiquidGlass |
 
-No database or backend changes needed. Pure frontend visual refinement.
+No database changes. No edge function changes.
 
