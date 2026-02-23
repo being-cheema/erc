@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import GoalProgress from "@/components/home/GoalProgress";
 import RecentActivity from "@/components/home/RecentActivity";
+import LiquidGlass from "liquid-glass-react";
 
 const motivationalLines = [
   { regular: "Keep pushing", bold: "your limits." },
@@ -144,41 +145,50 @@ const Home = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-card p-4 flex items-center justify-between"
         >
-          <div 
-            className="flex-1 text-center press-scale cursor-pointer"
-            onClick={() => handleCardTap("/leaderboard")}
+          <LiquidGlass
+            displacementScale={32}
+            blurAmount={0.06}
+            saturation={120}
+            cornerRadius={16}
+            padding="16px"
           >
-            <p className="stat-label">Rank</p>
-            <p className="text-2xl font-black text-foreground tracking-tight">
-              {userRank?.rank ? `#${userRank.rank}` : "—"}
-            </p>
-          </div>
+            <div className="flex items-center justify-between">
+              <div 
+                className="flex-1 text-center press-scale cursor-pointer"
+                onClick={() => handleCardTap("/leaderboard")}
+              >
+                <p className="stat-label">Rank</p>
+                <p className="text-2xl font-black text-foreground tracking-tight">
+                  {userRank?.rank ? `#${userRank.rank}` : "—"}
+                </p>
+              </div>
 
-          <div className="w-px h-8 bg-white/10" />
+              <div className="w-px h-8 bg-white/10" />
 
-          <div 
-            className="flex-1 text-center press-scale cursor-pointer"
-            onClick={() => handleCardTap("/stats")}
-          >
-            <p className="stat-label">Streak</p>
-            <p className="text-2xl font-black text-foreground tracking-tight">
-              {currentStreak}<span className="text-xs font-bold text-muted-foreground ml-0.5">D</span>
-            </p>
-          </div>
+              <div 
+                className="flex-1 text-center press-scale cursor-pointer"
+                onClick={() => handleCardTap("/stats")}
+              >
+                <p className="stat-label">Streak</p>
+                <p className="text-2xl font-black text-foreground tracking-tight">
+                  {currentStreak}<span className="text-xs font-bold text-muted-foreground ml-0.5">D</span>
+                </p>
+              </div>
 
-          <div className="w-px h-8 bg-white/10" />
+              <div className="w-px h-8 bg-white/10" />
 
-          <div 
-            className="flex-1 text-center press-scale cursor-pointer"
-            onClick={() => handleCardTap("/stats")}
-          >
-            <p className="stat-label">Runs</p>
-            <p className="text-2xl font-black text-foreground tracking-tight">
-              {profile?.total_runs || 0}
-            </p>
-          </div>
+              <div 
+                className="flex-1 text-center press-scale cursor-pointer"
+                onClick={() => handleCardTap("/stats")}
+              >
+                <p className="stat-label">Runs</p>
+                <p className="text-2xl font-black text-foreground tracking-tight">
+                  {profile?.total_runs || 0}
+                </p>
+              </div>
+            </div>
+          </LiquidGlass>
         </motion.div>
 
         {/* Recent Activity */}
@@ -192,44 +202,60 @@ const Home = () => {
           className="grid grid-cols-2 gap-3"
         >
           <div 
-            className="glass-card p-4 press-scale cursor-pointer"
+            className="press-scale cursor-pointer"
             onClick={() => handleCardTap("/races")}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-primary" />
+            <LiquidGlass
+              displacementScale={32}
+              blurAmount={0.06}
+              saturation={120}
+              cornerRadius={16}
+              padding="16px"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="stat-label">Next Race</p>
+                    <p className="text-sm font-bold text-foreground">
+                      {upcomingRace 
+                        ? format(new Date(upcomingRace.race_date), "MMM d")
+                        : "View All"
+                      }
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="stat-label">Next Race</p>
-                  <p className="text-sm font-bold text-foreground">
-                    {upcomingRace 
-                      ? format(new Date(upcomingRace.race_date), "MMM d")
-                      : "View All"
-                    }
-                  </p>
-                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
+            </LiquidGlass>
           </div>
 
           <div 
-            className="glass-card p-4 press-scale cursor-pointer"
+            className="press-scale cursor-pointer"
             onClick={() => handleCardTap("/training")}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                  <Dumbbell className="w-5 h-5 text-primary" />
+            <LiquidGlass
+              displacementScale={32}
+              blurAmount={0.06}
+              saturation={120}
+              cornerRadius={16}
+              padding="16px"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                    <Dumbbell className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="stat-label">Training</p>
+                    <p className="text-sm font-bold text-foreground">View Plans</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="stat-label">Training</p>
-                  <p className="text-sm font-bold text-foreground">View Plans</p>
-                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
+            </LiquidGlass>
           </div>
         </motion.div>
       </div>

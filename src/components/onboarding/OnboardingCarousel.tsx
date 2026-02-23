@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import OnboardingSlide from "./OnboardingSlide";
 import { useHaptics } from "@/hooks/useHaptics";
 import logo from "@/assets/logo.png";
+import LiquidGlass from "liquid-glass-react";
 
 const slides = [
   {
@@ -206,49 +207,57 @@ const OnboardingCarousel = ({ onComplete }: OnboardingCarouselProps) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Button
-              onClick={nextSlide}
-              className={`w-full h-14 text-base font-semibold border-0 text-white rounded-full transition-all duration-300 ${
-                isLastSlide 
-                  ? "bg-strava hover:bg-strava-dark shadow-lg"
-                  : "gradient-primary hover:opacity-90 shadow-lg"
-              }`}
-            >
-              {isLastSlide ? (
-                <span className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  Start Tracking
-                </span>
-              ) : (
-                <>
-                  Next
-                  <ChevronRight className="w-5 h-5 ml-1" />
-                </>
-              )}
-            </Button>
-          </motion.div>
-
-          {!isLastSlide && (
+        <LiquidGlass
+          displacementScale={32}
+          blurAmount={0.06}
+          saturation={120}
+          cornerRadius={20}
+          padding="24px"
+        >
+          <div className="space-y-3">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
               <Button
-                variant="ghost"
-                onClick={handleSkip}
-                className="w-full h-12 text-muted-foreground/70 hover:text-muted-foreground hover:bg-white/5"
+                onClick={nextSlide}
+                className={`w-full h-14 text-base font-semibold border-0 text-white rounded-full transition-all duration-300 ${
+                  isLastSlide 
+                    ? "bg-strava hover:bg-strava-dark shadow-lg"
+                    : "gradient-primary hover:opacity-90 shadow-lg"
+                }`}
               >
-                Skip
+                {isLastSlide ? (
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5" />
+                    Start Tracking
+                  </span>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="w-5 h-5 ml-1" />
+                  </>
+                )}
               </Button>
             </motion.div>
-          )}
-        </div>
+
+            {!isLastSlide && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={handleSkip}
+                  className="w-full h-12 text-muted-foreground/70 hover:text-muted-foreground hover:bg-white/5"
+                >
+                  Skip
+                </Button>
+              </motion.div>
+            )}
+          </div>
+        </LiquidGlass>
       </div>
     </motion.div>
   );
