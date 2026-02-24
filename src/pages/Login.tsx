@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useEffect, forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
@@ -22,51 +21,6 @@ StravaIcon.displayName = "StravaIcon";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-
-  // Listen for the deep link return from the in-app browser (native only)
-  useEffect(() => {
-    let listener: { remove: () => void } | null = null;
-
-    const handleDeepLink = async (url: string) => {
-      if (url.includes("auth/callback")) {
-        try { await Browser.close(); } catch { /* may already be closed */ }
-        const urlObj = new URL(url);
-        const token = urlObj.searchParams.get("token");
-        if (token) {
-          // Store JWT and hard-redirect — bypasses React Router lifecycle issues
-          api.setToken(token);
-          window.location.href = "/home";
-          return;
-        }
-        // Fallback for web flow (code-based)
-        navigate(`/auth/callback?${urlObj.searchParams.toString()}`);
-      }
-    };
-
-    const setup = async () => {
-      try {
-        const { App } = await import("@capacitor/app");
-
-        // Check if the app was launched/resumed via a deep link
-        // This catches links that fire BEFORE the listener is registered
-        const launchUrl = await App.getLaunchUrl();
-        if (launchUrl?.url) {
-          await handleDeepLink(launchUrl.url);
-        }
-
-        // Also listen for future deep links while the app is running
-        listener = await App.addListener("appUrlOpen", async ({ url }) => {
-          await handleDeepLink(url);
-        });
-      } catch {
-        // Not running on native platform
-      }
-    };
-
-    setup();
-    return () => { listener?.remove(); };
-  }, [navigate]);
 
   const handleStravaLogin = async () => {
     setIsLoading(true);

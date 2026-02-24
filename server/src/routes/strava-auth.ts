@@ -63,7 +63,6 @@ router.get('/', async (req: Request, res: Response) => {
         // ─── CALLBACK: Exchange code for tokens, create/find user ───
         if (action === 'callback') {
             const code = req.query.code as string;
-            console.log(`[strava-auth] Callback received, code: ${code ? code.slice(0, 8) + '...' : 'MISSING'}`);
             if (!code) {
                 return res.status(400).json({ error: 'code is required' });
             }
@@ -80,7 +79,6 @@ router.get('/', async (req: Request, res: Response) => {
                 }),
             });
 
-            console.log(`[strava-auth] Token exchange response: ${tokenResponse.status}`);
 
             if (!tokenResponse.ok) {
                 const errorText = await tokenResponse.text();
@@ -90,7 +88,6 @@ router.get('/', async (req: Request, res: Response) => {
 
             const tokenData = await tokenResponse.json();
             const { access_token, refresh_token, expires_at, athlete } = tokenData;
-            console.log(`[strava-auth] Token exchange OK, athlete: ${athlete?.firstname} ${athlete?.lastname}, id: ${athlete?.id}`);
 
             // Check if user exists with this Strava ID
             const existingProfile = await pool.query(
@@ -243,7 +240,6 @@ router.get('/', async (req: Request, res: Response) => {
                 role,
             });
 
-            console.log(`[strava-auth] Sending success response with JWT for user ${userId}, isNew: ${isNewUser}`);
             return res.json({
                 success: true,
                 user_id: userId,
@@ -328,7 +324,6 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/callback', async (req: Request, res: Response) => {
     try {
         const code = req.query.code as string;
-        console.log(`[strava-auth] Native callback received, code: ${code ? code.slice(0, 8) + '...' : 'MISSING'}`);
 
         if (!code) {
             return res.status(400).send('Authorization code missing. Please try again.');
@@ -354,7 +349,6 @@ router.get('/callback', async (req: Request, res: Response) => {
 
         const tokenData = await tokenResponse.json();
         const { access_token, refresh_token, expires_at, athlete } = tokenData;
-        console.log(`[strava-auth] Native callback OK, athlete: ${athlete?.firstname} ${athlete?.lastname}`);
 
         // Check if user exists with this Strava ID
         const existingProfile = await pool.query(
@@ -433,7 +427,6 @@ router.get('/callback', async (req: Request, res: Response) => {
         const role = roleResult.rows[0]?.role || 'member';
         const token = signToken({ user_id: userId, email: `strava_${athlete.id}@eroderunners.local`, role });
 
-        console.log(`[strava-auth] Native callback: storing token for polling, user ${userId}`);
 
         // Store token for polling — the app will retrieve it via GET /poll?state=<id>
         const state = (req.query.state as string) || '';
