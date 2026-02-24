@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X,
+import { 
+  Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X, 
   ArrowLeft, Loader2, Calendar, AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
+import { 
   Select,
   SelectContent,
   SelectItem,
@@ -73,6 +73,7 @@ const Admin = () => {
   const queryClient = useQueryClient();
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
 
+  // Fix: useEffect to avoid state update during render
   useEffect(() => {
     if (!adminLoading && !isAdmin) {
       toast.error("Access denied. Admin only.");
@@ -80,22 +81,43 @@ const Admin = () => {
     }
   }, [adminLoading, isAdmin, navigate]);
 
-  // Fetch data via admin API
+  // Fetch data
   const { data: races, isLoading: racesLoading } = useQuery({
     queryKey: ["admin", "races"],
-    queryFn: () => api.get('/api/races'),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("races")
+        .select("*")
+        .order("race_date", { ascending: true });
+      if (error) throw error;
+      return data as Race[];
+    },
     enabled: isAdmin === true,
   });
 
   const { data: blogPosts, isLoading: blogLoading } = useQuery({
     queryKey: ["admin", "blog_posts"],
-    queryFn: () => api.get('/api/blog'),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as BlogPost[];
+    },
     enabled: isAdmin === true,
   });
 
   const { data: trainingPlans, isLoading: plansLoading } = useQuery({
     queryKey: ["admin", "training_plans"],
-    queryFn: () => api.get('/api/training'),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("training_plans")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as TrainingPlan[];
+    },
     enabled: isAdmin === true,
   });
 
@@ -109,6 +131,7 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background safe-area-inset-top pb-24">
+      {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -200,9 +223,24 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
   const saveMutation = useMutation({
     mutationFn: async (race: Partial<Race>) => {
       if (race.id) {
-        return api.put(`/api/admin/races/${race.id}`, race);
+        const { error } = await supabase
+          .from("races")
+          .update(race)
+          .eq("id", race.id);
+        if (error) throw error;
       } else {
-        return api.post('/api/admin/races', race);
+        const { name, description, location, distance_type, race_date, image_url, registration_url, is_published } = race;
+        const { error } = await supabase.from("races").insert({
+          name: name!,
+          distance_type: distance_type!,
+          race_date: race_date!,
+          description,
+          location,
+          image_url,
+          registration_url,
+          is_published,
+        });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -218,7 +256,8 @@ const RacesAdmin = ({ races, loading }: { races: Race[]; loading: boolean }) => 
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.delete(`/api/admin/races/${id}`);
+      const { error } = await supabase.from("races").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "races"] });
@@ -336,14 +375,36 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<BlogPost>>({});
 
+  // BUG #9 FIX: Get current user to set author_id on new posts
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
+  }, []);
+
   const saveMutation = useMutation({
     mutationFn: async (post: Partial<BlogPost>) => {
       const slug = post.slug || post.title?.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "";
-      const payload = { ...post, slug };
       if (post.id) {
-        return api.put(`/api/admin/blog/${post.id}`, payload);
+        const { error } = await supabase
+          .from("blog_posts")
+          .update({ ...post, slug })
+          .eq("id", post.id);
+        if (error) throw error;
       } else {
-        return api.post('/api/admin/blog', payload);
+        const { title, excerpt, content, category, image_url, is_published } = post;
+        const { error } = await supabase.from("blog_posts").insert({
+          title: title!,
+          slug,
+          content: content!,
+          category: category!,
+          excerpt,
+          image_url,
+          is_published,
+          author_id: currentUserId,
+        });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -359,7 +420,8 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.delete(`/api/admin/blog/${id}`);
+      const { error } = await supabase.from("blog_posts").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "blog_posts"] });
@@ -477,9 +539,22 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
   const saveMutation = useMutation({
     mutationFn: async (plan: Partial<TrainingPlan>) => {
       if (plan.id) {
-        return api.put(`/api/admin/training/${plan.id}`, plan);
+        const { error } = await supabase
+          .from("training_plans")
+          .update(plan)
+          .eq("id", plan.id);
+        if (error) throw error;
       } else {
-        return api.post('/api/admin/training', plan);
+        const { name, description, level, goal_distance, duration_weeks, is_published } = plan;
+        const { error } = await supabase.from("training_plans").insert({
+          name: name!,
+          level: level!,
+          goal_distance: goal_distance!,
+          duration_weeks: duration_weeks!,
+          description,
+          is_published,
+        });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -495,7 +570,8 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.delete(`/api/admin/training/${id}`);
+      const { error } = await supabase.from("training_plans").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "training_plans"] });

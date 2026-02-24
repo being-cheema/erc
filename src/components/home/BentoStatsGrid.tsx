@@ -11,7 +11,7 @@ const BentoStatsGrid = () => {
   const { data: weeklyData, isLoading: weeklyLoading } = useWeeklyStats();
   const { data: allTimeStats, isLoading: statsLoading } = useAllTimeStats();
 
-  const distanceKm = monthlyDistance?.totalDistance ? (monthlyDistance.totalDistance / 1000).toFixed(1) : "0";
+  const distanceKm = monthlyDistance ? (monthlyDistance / 1000).toFixed(1) : "0";
   const totalCalories = allTimeStats?.totalCalories || 0;
   const monthlyCalories = totalCalories > 0 ? Math.round(totalCalories / Math.max(1, allTimeStats?.totalRuns || 1)) : 0;
 

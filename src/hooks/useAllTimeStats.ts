@@ -1,45 +1,143 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useProfile";
 
+export interface AllTimeStats {
+  totalDistance: number;
+  totalRuns: number;
+  totalElevation: number;
+  totalCalories: number;
+  avgPace: number | null;
+  avgHeartRate: number | null;
+  currentStreak: number;
+  longestStreak: number;
+}
+
+function calculateStreaks(dates: Date[]): { currentStreak: number; longestStreak: number } {
+  if (dates.length === 0) {
+    return { currentStreak: 0, longestStreak: 0 };
+  }
+
+  // Get unique dates (day-level) and sort descending
+  const uniqueDates = [...new Set(dates.map(d => {
+    const date = new Date(d);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  }))].sort((a, b) => b - a);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTime = today.getTime();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let tempStreak = 0;
+
+  for (let i = 0; i < uniqueDates.length; i++) {
+    const dateTime = uniqueDates[i];
+
+    if (i === 0) {
+      const daysDiff = Math.floor((todayTime - dateTime) / oneDayMs);
+      if (daysDiff <= 1) {
+        tempStreak = 1;
+        currentStreak = 1;
+      } else {
+        tempStreak = 1;
+      }
+    } else {
+      const prevDateTime = uniqueDates[i - 1];
+      const daysDiff = Math.floor((prevDateTime - dateTime) / oneDayMs);
+      
+      if (daysDiff === 1) {
+        tempStreak++;
+        if (currentStreak > 0) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        tempStreak = 1;
+      }
+    }
+    
+    longestStreak = Math.max(longestStreak, tempStreak);
+  }
+
+  return { currentStreak, longestStreak };
+}
+
 export function useAllTimeStats() {
-  const { user } = useCurrentUser();
+  const { data: user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ['all-time-stats', user?.user_id],
-    queryFn: async () => {
-      const activities = await api.get('/api/activities');
-      if (!activities || !activities.length) {
+    queryKey: ["allTimeStats", user?.id],
+    queryFn: async (): Promise<AllTimeStats> => {
+      if (!user?.id) {
         return {
-          totalDistance: 0, totalRuns: 0, totalCalories: 0, totalElevation: 0,
-          totalMovingTime: 0, avgPace: 0, avgDistance: 0, longestRun: 0, fastestPace: 0,
+          totalDistance: 0,
+          totalRuns: 0,
+          totalElevation: 0,
+          totalCalories: 0,
+          avgPace: null,
+          avgHeartRate: null,
+          currentStreak: 0,
+          longestStreak: 0,
         };
       }
 
-      const totalDistance = activities.reduce((s: number, a: any) => s + Number(a.distance || 0), 0);
-      const totalRuns = activities.length;
-      const totalCalories = activities.reduce((s: number, a: any) => s + Number(a.calories || 0), 0);
-      const totalElevation = activities.reduce((s: number, a: any) => s + Number(a.elevation_gain || 0), 0);
-      const totalMovingTime = activities.reduce((s: number, a: any) => s + Number(a.moving_time || 0), 0);
+      // Fetch all activities for the user
+      const { data: activities, error } = await supabase
+        .from("activities")
+        .select("distance, elevation_gain, calories, average_pace, average_heartrate, start_date")
+        .eq("user_id", user.id);
 
-      const paces = activities
-        .filter((a: any) => a.average_pace && Number(a.average_pace) > 0)
-        .map((a: any) => Number(a.average_pace));
-      const avgPace = paces.length > 0 ? paces.reduce((s: number, p: number) => s + p, 0) / paces.length : 0;
-      const fastestPace = paces.length > 0 ? Math.min(...paces) : 0;
+      if (error) throw error;
+
+      if (!activities || activities.length === 0) {
+        return {
+          totalDistance: 0,
+          totalRuns: 0,
+          totalElevation: 0,
+          totalCalories: 0,
+          avgPace: null,
+          avgHeartRate: null,
+          currentStreak: 0,
+          longestStreak: 0,
+        };
+      }
+
+      // Calculate totals
+      const totalDistance = activities.reduce((sum, a) => sum + (Number(a.distance) || 0), 0);
+      const totalRuns = activities.length;
+      const totalElevation = activities.reduce((sum, a) => sum + (Number(a.elevation_gain) || 0), 0);
+      const totalCalories = activities.reduce((sum, a) => sum + (Number(a.calories) || 0), 0);
+
+      // Calculate averages
+      const activitiesWithPace = activities.filter(a => a.average_pace != null);
+      const avgPace = activitiesWithPace.length > 0
+        ? activitiesWithPace.reduce((sum, a) => sum + (Number(a.average_pace) || 0), 0) / activitiesWithPace.length
+        : null;
+
+      const activitiesWithHR = activities.filter(a => a.average_heartrate != null);
+      const avgHeartRate = activitiesWithHR.length > 0
+        ? Math.round(activitiesWithHR.reduce((sum, a) => sum + (Number(a.average_heartrate) || 0), 0) / activitiesWithHR.length)
+        : null;
+
+      // Calculate streaks
+      const runDates = activities.map(a => new Date(a.start_date));
+      const { currentStreak, longestStreak } = calculateStreaks(runDates);
 
       return {
         totalDistance,
         totalRuns,
-        totalCalories,
         totalElevation,
-        totalMovingTime,
+        totalCalories,
         avgPace,
-        avgDistance: totalRuns > 0 ? totalDistance / totalRuns : 0,
-        longestRun: Math.max(...activities.map((a: any) => Number(a.distance || 0))),
-        fastestPace,
+        avgHeartRate,
+        currentStreak,
+        longestStreak,
       };
     },
-    enabled: !!user,
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

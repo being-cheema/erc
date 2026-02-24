@@ -1,30 +1,76 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
-export function useLeaderboard(period: string = 'monthly') {
+export interface LeaderboardEntry {
+  id: string;
+  user_id: string;
+  total_distance: number;
+  total_runs: number;
+  rank: number | null;
+  rank_change: number | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+export const useMonthlyLeaderboard = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
   return useQuery({
-    queryKey: ['leaderboard', period],
+    queryKey: ["leaderboard", "monthly", year, month],
     queryFn: async () => {
-      return api.get(`/api/leaderboard?period=${period}`);
+      // Get leaderboard entries with profile info
+      const { data: leaderboard, error: lError } = await supabase
+        .from("monthly_leaderboard")
+        .select("*")
+        .eq("year", year)
+        .eq("month", month)
+        .order("rank", { ascending: true, nullsFirst: false });
+
+      if (lError) throw lError;
+
+      // Get profile info for all users using secure view
+      const userIds = leaderboard?.map(l => l.user_id) || [];
+      const { data: profiles } = await supabase
+        .from("profiles_public")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+      return leaderboard?.map(entry => ({
+        ...entry,
+        display_name: profileMap.get(entry.user_id)?.display_name || "Anonymous",
+        avatar_url: profileMap.get(entry.user_id)?.avatar_url,
+      })) as LeaderboardEntry[];
     },
   });
-}
+};
 
-// Aliases used by components
-export function useMonthlyLeaderboard() {
-  return useLeaderboard('monthly');
-}
-
-export function useAllTimeLeaderboard() {
-  return useLeaderboard('alltime');
-}
-
-export function useUserRankData() {
+export const useAllTimeLeaderboard = () => {
   return useQuery({
-    queryKey: ['leaderboard', 'me'],
+    queryKey: ["leaderboard", "alltime"],
     queryFn: async () => {
-      return api.get('/api/leaderboard/me');
+      // Use the secure view that excludes sensitive token data
+      const { data, error } = await supabase
+        .from("profiles_public")
+        .select("user_id, display_name, avatar_url, total_distance, total_runs")
+        .order("total_distance", { ascending: false, nullsFirst: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      return data?.map((p, index) => ({
+        id: p.user_id,
+        user_id: p.user_id,
+        total_distance: p.total_distance || 0,
+        total_runs: p.total_runs || 0,
+        rank: index + 1,
+        rank_change: null,
+        display_name: p.display_name || "Anonymous",
+        avatar_url: p.avatar_url,
+      })) as LeaderboardEntry[];
     },
-    enabled: api.isAuthenticated(),
   });
-}
+};

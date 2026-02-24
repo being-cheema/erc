@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, Target, CheckCircle2, Circle, Loader2, Dumbbell, Calendar } from "lucide-react";
@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/useProfile";
 import { useHaptics } from "@/hooks/useHaptics";
 import { toast } from "sonner";
 
@@ -18,8 +19,6 @@ interface TrainingPlan {
   level: string;
   duration_weeks: number;
   goal_distance: string;
-  weeks: TrainingWeek[];
-  userProgress: { workout_id: string; completed_at: string }[];
 }
 
 interface TrainingWeek {
@@ -62,48 +61,122 @@ const TrainingPlanDetail = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: user } = useCurrentUser();
   const { lightImpact, mediumImpact, notificationSuccess } = useHaptics();
   const [selectedWeek, setSelectedWeek] = useState(1);
 
-  // Fetch plan details with weeks, workouts, and progress in one call
-  const { data: plan, isLoading } = useQuery({
+  // Fetch plan details
+  const { data: plan, isLoading: planLoading } = useQuery({
     queryKey: ["trainingPlan", planId],
     queryFn: async () => {
-      return api.get<TrainingPlan>(`/api/training/${planId}`);
+      const { data, error } = await supabase
+        .from("training_plans")
+        .select("*")
+        .eq("id", planId)
+        .single();
+      
+      if (error) throw error;
+      return data as TrainingPlan;
     },
     enabled: !!planId,
   });
 
-  const weeks = plan?.weeks || [];
-  const completedWorkoutIds = plan?.userProgress?.map(p => p.workout_id) || [];
+  // Fetch weeks and workouts
+  const { data: weeks, isLoading: weeksLoading } = useQuery({
+    queryKey: ["trainingWeeks", planId],
+    queryFn: async () => {
+      const { data: weeksData, error: weeksError } = await supabase
+        .from("training_weeks")
+        .select("*")
+        .eq("plan_id", planId)
+        .order("week_number", { ascending: true });
+      
+      if (weeksError) throw weeksError;
+
+      // Fetch workouts for all weeks
+      const weekIds = weeksData.map(w => w.id);
+      const { data: workoutsData, error: workoutsError } = await supabase
+        .from("training_workouts")
+        .select("*")
+        .in("week_id", weekIds)
+        .order("day_of_week", { ascending: true });
+
+      if (workoutsError) throw workoutsError;
+
+      // Combine weeks with their workouts
+      return weeksData.map(week => ({
+        ...week,
+        workouts: workoutsData.filter(w => w.week_id === week.id),
+      })) as TrainingWeek[];
+    },
+    enabled: !!planId,
+  });
+
+  // Fetch user progress
+  const { data: progress } = useQuery({
+    queryKey: ["trainingProgress", planId, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("user_training_progress")
+        .select("workout_id")
+        .eq("plan_id", planId)
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      return data.map(p => p.workout_id);
+    },
+    enabled: !!planId && !!user?.id,
+  });
 
   // Toggle workout completion
   const toggleWorkoutMutation = useMutation({
     mutationFn: async (workoutId: string) => {
-      const isCompleted = completedWorkoutIds.includes(workoutId);
+      if (!user?.id || !planId) throw new Error("Not authenticated");
+
+      const isCompleted = progress?.includes(workoutId);
 
       if (isCompleted) {
-        return api.delete(`/api/training/${planId}/progress/${workoutId}`);
+        // Remove completion
+        const { error } = await supabase
+          .from("user_training_progress")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("workout_id", workoutId);
+        
+        if (error) throw error;
       } else {
-        return api.post(`/api/training/${planId}/progress/${workoutId}`);
+        // Add completion
+        const { error } = await supabase
+          .from("user_training_progress")
+          .insert({
+            user_id: user.id,
+            plan_id: planId,
+            workout_id: workoutId,
+          });
+        
+        if (error) throw error;
       }
     },
     onSuccess: (_, workoutId) => {
-      const wasCompleted = completedWorkoutIds.includes(workoutId);
+      const wasCompleted = progress?.includes(workoutId);
       if (!wasCompleted) {
         notificationSuccess();
         toast.success("Workout completed! 💪");
       } else {
         lightImpact();
       }
-      queryClient.invalidateQueries({ queryKey: ["trainingPlan", planId] });
+      queryClient.invalidateQueries({ queryKey: ["trainingProgress", planId] });
     },
   });
 
-  const currentWeek = weeks.find(w => w.week_number === selectedWeek);
-  const totalWorkouts = weeks.reduce((sum, w) => sum + w.workouts.filter(wo => wo.workout_type.toLowerCase() !== "rest").length, 0);
-  const completedWorkouts = completedWorkoutIds.length;
+  const currentWeek = weeks?.find(w => w.week_number === selectedWeek);
+  const totalWorkouts = weeks?.reduce((sum, w) => sum + w.workouts.filter(wo => wo.workout_type.toLowerCase() !== "rest").length, 0) || 0;
+  const completedWorkouts = progress?.length || 0;
   const progressPercent = totalWorkouts > 0 ? Math.round((completedWorkouts / totalWorkouts) * 100) : 0;
+
+  const isLoading = planLoading || weeksLoading;
 
   if (isLoading) {
     return (
@@ -142,7 +215,7 @@ const TrainingPlanDetail = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
-
+        
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{plan.name}</h1>
@@ -160,7 +233,7 @@ const TrainingPlanDetail = () => {
             <Target className="w-6 h-6 text-white" />
           </div>
         </div>
-
+        
         {plan.description && (
           <p className="text-muted-foreground text-sm mt-3">{plan.description}</p>
         )}
@@ -196,11 +269,11 @@ const TrainingPlanDetail = () => {
           transition={{ delay: 0.2 }}
           className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
         >
-          {weeks.map((week) => {
+          {weeks?.map((week) => {
             const weekWorkouts = week.workouts.filter(w => w.workout_type.toLowerCase() !== "rest");
-            const weekCompleted = weekWorkouts.filter(w => completedWorkoutIds.includes(w.id)).length;
+            const weekCompleted = weekWorkouts.filter(w => progress?.includes(w.id)).length;
             const isComplete = weekWorkouts.length > 0 && weekCompleted === weekWorkouts.length;
-
+            
             return (
               <Button
                 key={week.id}
@@ -210,8 +283,9 @@ const TrainingPlanDetail = () => {
                   lightImpact();
                   setSelectedWeek(week.week_number);
                 }}
-                className={`shrink-0 relative ${selectedWeek === week.week_number ? "" : "border-border/50"
-                  }`}
+                className={`shrink-0 relative ${
+                  selectedWeek === week.week_number ? "" : "border-border/50"
+                }`}
               >
                 Week {week.week_number}
                 {isComplete && (
@@ -247,9 +321,9 @@ const TrainingPlanDetail = () => {
                   </p>
                 ) : (
                   currentWeek.workouts.map((workout) => {
-                    const isCompleted = completedWorkoutIds.includes(workout.id);
+                    const isCompleted = progress?.includes(workout.id);
                     const isRest = workout.workout_type.toLowerCase() === "rest";
-
+                    
                     return (
                       <motion.div
                         key={workout.id}
@@ -260,19 +334,21 @@ const TrainingPlanDetail = () => {
                             toggleWorkoutMutation.mutate(workout.id);
                           }
                         }}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${isRest
-                            ? "bg-muted/50 cursor-default"
-                            : isCompleted
-                              ? "bg-success/10"
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          isRest 
+                            ? "bg-muted/50 cursor-default" 
+                            : isCompleted 
+                              ? "bg-success/10" 
                               : "bg-card hover:bg-muted/50"
-                          }`}
+                        }`}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isRest
-                            ? "bg-muted"
-                            : isCompleted
-                              ? "bg-success"
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                          isRest 
+                            ? "bg-muted" 
+                            : isCompleted 
+                              ? "bg-success" 
                               : "bg-muted"
-                          }`}>
+                        }`}>
                           {isRest ? (
                             <span className="text-lg">😴</span>
                           ) : isCompleted ? (
@@ -281,7 +357,7 @@ const TrainingPlanDetail = () => {
                             <Circle className="w-5 h-5 text-muted-foreground" />
                           )}
                         </div>
-
+                        
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">

@@ -1,18 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
-export function useIsAdmin() {
-  const query = useQuery({
-    queryKey: ['user-role'],
+export const useIsAdmin = () => {
+  const { data: isAdmin = false, isLoading } = useQuery({
+    queryKey: ["isAdmin"],
     queryFn: async () => {
-      const data = await api.get('/api/notifications/role');
-      return data.role === 'admin';
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      return !!data;
     },
-    enabled: api.isAuthenticated(),
   });
 
-  return {
-    isAdmin: query.data === true,
-    isLoading: query.isLoading,
-  };
-}
+  return { isAdmin, isLoading };
+};

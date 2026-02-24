@@ -31,15 +31,12 @@ const AppContent = () => {
   useAppLifecycle();
 
   return (
-    <Routes>
-      {/* Public routes — no auth required */}
-      <Route path="/" element={<Navigate to="/onboarding" replace />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/auth/callback" element={<StravaCallback />} />
-
-      {/* Protected routes — require authentication */}
-      <Route element={<AuthRouter />}>
+    <AuthRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/onboarding" replace />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<StravaCallback />} />
         <Route element={<AppLayout />}>
           <Route path="/home" element={<Home />} />
           <Route path="/races" element={<Races />} />
@@ -53,10 +50,9 @@ const AppContent = () => {
           <Route path="/admin" element={<Admin />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
-        {/* Unknown routes for authenticated users */}
         <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </AuthRouter>
   );
 };
 
