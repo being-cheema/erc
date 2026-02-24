@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, forwardRef } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
@@ -21,16 +21,35 @@ StravaIcon.displayName = "StravaIcon";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setIsLoading(false);
+  };
 
   const handleStravaLogin = async () => {
+    if (isLoading) return; // Guard against double-tap
     setIsLoading(true);
+    setError(null);
+
     try {
       const isNative = Capacitor.isNativePlatform();
       const redirectUri = isNative
         ? `${import.meta.env.VITE_SUPABASE_URL}/auth/strava/callback`
         : `${window.location.origin}/auth/callback`;
 
-      // Generate a random state ID for the polling flow (native only)
       const stateId = isNative ? crypto.randomUUID() : '';
       const stateParam = stateId ? `&state=${stateId}` : '';
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}${stateParam}`;
@@ -40,30 +59,37 @@ const Login = () => {
 
       if (data.url) {
         if (isNative) {
-          console.log("Opening in-app browser (native):", data.url);
           try {
+            // Listen for browser close — stop polling if user cancels
+            const browserListener = await Browser.addListener("browserFinished", () => {
+              stopPolling();
+              browserListener.remove();
+            });
+
             await Browser.open({ url: data.url });
           } catch (browserError) {
             console.error("Browser.open failed:", browserError);
             window.open(data.url, "_system");
           }
 
-          // Poll the server for the token — no deep link dependency
+          // Cancel any existing poll from a previous attempt
+          if (pollRef.current) clearInterval(pollRef.current);
+
+          // Poll the server for the token
           const pollUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth/poll?state=${stateId}`;
-          const maxAttempts = 120; // 3 minutes max (120 * 1.5s)
+          const maxAttempts = 120;
           let attempts = 0;
 
-          const pollInterval = setInterval(async () => {
+          pollRef.current = setInterval(async () => {
             attempts++;
             try {
               const pollRes = await fetch(pollUrl);
               const pollData = await pollRes.json();
 
               if (pollData.ready && pollData.token) {
-                clearInterval(pollInterval);
+                stopPolling();
                 api.setToken(pollData.token);
                 try { await Browser.close(); } catch { /* may already be closed */ }
-                setIsLoading(false);
                 window.location.href = "/home";
               }
             } catch {
@@ -71,9 +97,8 @@ const Login = () => {
             }
 
             if (attempts >= maxAttempts) {
-              clearInterval(pollInterval);
-              setIsLoading(false);
-              console.error("Polling timed out");
+              stopPolling();
+              setError("Login timed out. Please try again.");
             }
           }, 1500);
         } else {
@@ -82,10 +107,12 @@ const Login = () => {
       } else {
         console.error("No auth URL received:", data.error);
         setIsLoading(false);
+        setError("Could not connect to Strava. Please try again.");
       }
     } catch (error) {
       console.error("Login error:", error);
       setIsLoading(false);
+      setError("Something went wrong. Please try again.");
     }
   };
 
@@ -161,6 +188,12 @@ const Login = () => {
               <p className="text-center text-xs text-muted-foreground leading-relaxed">
                 We sync your runs from Strava to show stats and rankings.
               </p>
+
+              {error && (
+                <p className="text-center text-sm text-red-400 font-medium">
+                  {error}
+                </p>
+              )}
             </motion.div>
           </div>
         </motion.div>
