@@ -4,9 +4,9 @@ import { recordCalls, canMakeCalls, getUserSyncBudget, getUsageStats, updateFrom
 const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID!;
 const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
 
-// Sync interval: every 6 hours = 4 syncs/day
-// With 999 users and 3,000 daily limit: ~3 calls/user/day
-const BATCH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+// Safety net sync: once per day to catch any missed webhook events.
+// Primary sync is now done via webhooks (see routes/webhook.ts).
+const BATCH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CALLS_PER_USER = 3; // token refresh + 1-2 activity pages
 
 async function refreshToken(userId: string, refreshTokenValue: string): Promise<string | null> {
@@ -170,6 +170,7 @@ export async function runScheduledSync() {
             `SELECT user_id, strava_access_token, strava_refresh_token, strava_token_expires_at, total_runs, total_distance
              FROM profiles
              WHERE strava_id IS NOT NULL
+               AND (last_synced_at IS NULL OR last_synced_at < NOW() - INTERVAL '24 hours')
              ORDER BY last_synced_at ASC NULLS FIRST
              LIMIT $1`,
             [Math.min(budget, 999)] // Sync all users that fit within the budget
@@ -216,7 +217,7 @@ export async function runScheduledSync() {
 
 export function startScheduledSync() {
     const batchesPerDay = (24 * 60 * 60 * 1000) / BATCH_INTERVAL_MS;
-    console.log(`⏰ Scheduled sync: every ${BATCH_INTERVAL_MS / (60 * 60 * 1000)}h, ${batchesPerDay} syncs/day`);
+    console.log(`⏰ Safety net sync: every ${BATCH_INTERVAL_MS / (60 * 60 * 1000)}h (primary sync via webhooks)`);
     console.log(`⏰ Budget: 2,800 reads/day usable, ~${CALLS_PER_USER} calls/user`);
 
     // First sync 30 seconds after startup

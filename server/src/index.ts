@@ -16,6 +16,7 @@ import blogRouter from './routes/blog.js';
 import trainingRouter from './routes/training.js';
 import adminRouter from './routes/admin.js';
 import notificationsRouter from './routes/notifications.js';
+import webhookRouter from './routes/webhook.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -66,6 +67,9 @@ app.use('/api/blog', blogRouter);
 app.use('/api/training', trainingRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/notifications', notificationsRouter);
+
+// Strava webhook — outside /functions/ namespace, Strava hits this directly
+app.use('/webhook', webhookRouter);
 
 // 404 fallback
 app.use((_req, res) => {
