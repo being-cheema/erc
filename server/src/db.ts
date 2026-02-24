@@ -1,7 +1,12 @@
 import pg from 'pg';
 
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+    throw new Error('FATAL: DATABASE_URL environment variable is not set');
+}
+
 const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL || 'postgres://erode_runner:erode_runner_pass@postgres:5432/erode_runners',
+    connectionString: DATABASE_URL,
 });
 
 pool.on('error', (err) => {
