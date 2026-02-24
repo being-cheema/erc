@@ -30,13 +30,40 @@ const StravaCallback = () => {
   const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
     const error = searchParams.get("error");
-    const source = searchParams.get("source");
+    const token = searchParams.get("token"); // From server-side native OAuth redirect
+    const isNewUserParam = searchParams.get("is_new_user");
+    const athleteNameParam = searchParams.get("athlete_name");
 
-    // When running inside the in-app browser (Chrome Custom Tab) after Strava redirect,
-    // bounce back to the native app via deep link. Don't import Capacitor here —
-    // it's not available in the browser context and would fail silently.
-    if (source === "native" && code) {
-      window.location.href = `eroderunners://auth/callback?code=${encodeURIComponent(code)}`;
+    // ─── TOKEN FROM SERVER-SIDE REDIRECT (native app flow) ───
+    // The server already did the full OAuth exchange and sent us the JWT via deep link.
+    // Just store it and navigate to home — no API call needed.
+    if (token) {
+      api.setToken(token);
+      const athleteName = athleteNameParam || "Runner";
+      const isNewUser = isNewUserParam === "true";
+
+      if (!isNewUser) {
+        setSyncState({ step: "complete", message: `Welcome back, ${athleteName}!`, progress: 100 });
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        navigate("/home");
+        return;
+      }
+
+      // New user — trigger sync then go to home
+      setSyncState({ step: "syncing", message: `Welcome, ${athleteName}! Syncing your activities...`, progress: 30 });
+      try {
+        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
+        await fetch(syncUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ user_id: api.getUserId(), force_full_sync: true }),
+        });
+      } catch (syncError) {
+        console.error("Sync error:", syncError);
+      }
+      setSyncState({ step: "complete", message: `You're all set, ${athleteName}!`, progress: 100 });
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      navigate("/home");
       return;
     }
 

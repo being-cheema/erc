@@ -73,7 +73,9 @@ class ApiClient {
 
     if (response.status === 401) {
       this.clearToken();
-      window.location.href = '/login';
+      // Don't hard-redirect — let AuthRouter handle navigation.
+      // Hard redirect here causes a race condition: after re-login,
+      // stale cached requests can return 401 and wipe the fresh token.
       throw new Error('Session expired');
     }
 

@@ -27,15 +27,28 @@ const Login = () => {
   useEffect(() => {
     let listener: { remove: () => void } | null = null;
 
+    const handleDeepLink = async (url: string) => {
+      if (url.includes("auth/callback")) {
+        try { await Browser.close(); } catch { /* may already be closed */ }
+        const urlObj = new URL(url);
+        navigate(`/auth/callback?${urlObj.searchParams.toString()}`);
+      }
+    };
+
     const setup = async () => {
       try {
         const { App } = await import("@capacitor/app");
+
+        // Check if the app was launched/resumed via a deep link
+        // This catches links that fire BEFORE the listener is registered
+        const launchUrl = await App.getLaunchUrl();
+        if (launchUrl?.url) {
+          await handleDeepLink(launchUrl.url);
+        }
+
+        // Also listen for future deep links while the app is running
         listener = await App.addListener("appUrlOpen", async ({ url }) => {
-          if (url.includes("auth/callback")) {
-            await Browser.close();
-            const urlObj = new URL(url);
-            navigate(`/auth/callback?${urlObj.searchParams.toString()}`);
-          }
+          await handleDeepLink(url);
         });
       } catch {
         // Not running on native platform
@@ -50,10 +63,10 @@ const Login = () => {
     setIsLoading(true);
     try {
       const isNative = Capacitor.isNativePlatform();
-      // On native, append ?source=native so StravaCallback can bounce back via deep link.
-      // window.location.origin on native = https://api.eroderunnersclub.com (OTA server URL)
+      // On native, Strava redirects to the server-side callback which does the full
+      // token exchange and redirects to eroderunners:// deep link with JWT.
       const redirectUri = isNative
-        ? `${window.location.origin}/auth/callback?source=native`
+        ? `${import.meta.env.VITE_SUPABASE_URL}/auth/strava/callback`
         : `${window.location.origin}/auth/callback`;
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
@@ -102,13 +115,13 @@ const Login = () => {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="flex justify-center"
             >
-              <img 
-                src={logo} 
-                alt="Erode Runners Club" 
+              <img
+                src={logo}
+                alt="Erode Runners Club"
                 className="h-24 w-auto object-contain"
               />
             </motion.div>
-            
+
             {/* Title */}
             <motion.div
               initial={{ opacity: 0 }}

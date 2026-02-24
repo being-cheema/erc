@@ -203,6 +203,7 @@ const Settings = () => {
 
   const handleSignOut = () => {
     api.clearToken();
+    queryClient.clear(); // Prevent stale queries from firing 401s after re-login
     navigate("/login");
   };
 
