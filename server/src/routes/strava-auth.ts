@@ -419,9 +419,13 @@ router.get('/callback', async (req: Request, res: Response) => {
         // Build the deep link URL
         const deepLink = `eroderunners://auth/callback?token=${encodeURIComponent(token)}&is_new_user=${isNewUser}&athlete_name=${encodeURIComponent(athlete.firstname || 'Runner')}`;
 
-        // Serve an HTML page that auto-redirects via JavaScript.
-        // Chrome Custom Tabs BLOCK 302 redirects to custom URL schemes (no user gesture).
-        // JavaScript window.location.href follows the user gesture chain and is allowed.
+        // Build an Android intent:// URL — Chrome has native support for these
+        // and won't block them like custom schemes (eroderunners://)
+        const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&is_new_user=${isNewUser}&athlete_name=${encodeURIComponent(athlete.firstname || 'Runner')}#Intent;scheme=eroderunners;package=com.eroderunners.app;end`;
+
+        // Serve an HTML page that auto-redirects via intent:// scheme.
+        // Chrome Custom Tabs block both 302 redirects AND JS redirects to custom schemes,
+        // but intent:// is handled natively by Chrome.
         res.setHeader('Content-Type', 'text/html');
         return res.send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -439,13 +443,13 @@ router.get('/callback', async (req: Request, res: Response) => {
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 <script>
-  // Auto-redirect via JS — Chrome allows this unlike 302 redirects
-  window.location.href = ${JSON.stringify(deepLink)};
-  // Fallback: show the button after a short delay if redirect didn't work
+  // Use intent:// scheme — Chrome handles this natively unlike custom schemes
+  window.location.href = ${JSON.stringify(intentUrl)};
+  // Fallback: show the button after a short delay
   setTimeout(function() {
     document.getElementById('fallback').style.display = 'block';
     document.getElementById('spinner').style.display = 'none';
-  }, 1500);
+  }, 2000);
 </script>
 </head><body>
 <div class="card">
