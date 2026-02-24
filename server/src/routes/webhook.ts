@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
 import { recordCalls, canMakeCalls, updateFromHeaders } from '../rate-limiter.js';
+import { encryptToken, decryptToken } from '../utils/crypto.js';
 
 const router = Router();
 
@@ -89,14 +90,14 @@ async function processWebhookEvent(event: {
 
     // ── Activity created or updated — fetch it from Strava ──
     if (aspect_type === 'create' || aspect_type === 'update') {
-        let accessToken = profile.strava_access_token;
+        let accessToken = decryptToken(profile.strava_access_token);
         if (!accessToken) return;
 
         // Refresh token if expired
         const expiresAt = new Date(profile.strava_token_expires_at || 0);
         if (expiresAt < new Date()) {
             if (!profile.strava_refresh_token) return;
-            accessToken = await refreshToken(profile.user_id, profile.strava_refresh_token);
+            accessToken = await refreshToken(profile.user_id, decryptToken(profile.strava_refresh_token));
             if (!accessToken) {
                 console.error(`[webhook] Token refresh failed for user ${profile.user_id}`);
                 return;
@@ -149,7 +150,7 @@ async function refreshToken(userId: string, refreshTokenValue: string): Promise<
 
         await pool.query(
             `UPDATE profiles SET strava_access_token = $1, strava_refresh_token = $2, strava_token_expires_at = $3 WHERE user_id = $4`,
-            [data.access_token, data.refresh_token, new Date(data.expires_at * 1000).toISOString(), userId]
+            [encryptToken(data.access_token), encryptToken(data.refresh_token), new Date(data.expires_at * 1000).toISOString(), userId]
         );
 
         return data.access_token;

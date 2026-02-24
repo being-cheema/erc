@@ -1,5 +1,6 @@
 import pool from './db.js';
 import { recordCalls, canMakeCalls, getUserSyncBudget, getUsageStats, updateFromHeaders } from './rate-limiter.js';
+import { encryptToken, decryptToken } from './utils/crypto.js';
 
 const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID!;
 const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
@@ -31,7 +32,7 @@ async function refreshToken(userId: string, refreshTokenValue: string): Promise<
 
         await pool.query(
             `UPDATE profiles SET strava_access_token = $1, strava_refresh_token = $2, strava_token_expires_at = $3 WHERE user_id = $4`,
-            [data.access_token, data.refresh_token, new Date(data.expires_at * 1000).toISOString(), userId]
+            [encryptToken(data.access_token), encryptToken(data.refresh_token), new Date(data.expires_at * 1000).toISOString(), userId]
         );
 
         return data.access_token;
@@ -67,14 +68,14 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
             return { userId: profile.user_id, success: false, error: 'Rate limit budget exhausted' };
         }
 
-        let accessToken = profile.strava_access_token;
+        let accessToken = decryptToken(profile.strava_access_token);
         if (!accessToken) return { userId: profile.user_id, success: false, error: 'No access token' };
 
         // Refresh expired token
         const expiresAt = new Date(profile.strava_token_expires_at || 0);
         if (expiresAt < new Date()) {
             if (!profile.strava_refresh_token) return { userId: profile.user_id, success: false, error: 'No refresh token' };
-            accessToken = await refreshToken(profile.user_id, profile.strava_refresh_token);
+            accessToken = await refreshToken(profile.user_id, decryptToken(profile.strava_refresh_token));
             if (!accessToken) return { userId: profile.user_id, success: false, error: 'Token refresh failed' };
         }
 

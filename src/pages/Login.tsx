@@ -89,6 +89,7 @@ const Login = () => {
               if (pollData.ready && pollData.token) {
                 stopPolling();
                 api.setToken(pollData.token);
+                if (pollData.refresh_token) api.setRefreshToken(pollData.refresh_token);
                 try { await Browser.close(); } catch { /* may already be closed */ }
                 window.location.href = "/home";
               }

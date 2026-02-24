@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { signToken } from '../utils/jwt.js';
+import { signToken, generateRefreshToken } from '../utils/jwt.js';
+import { encryptToken, decryptToken } from '../utils/crypto.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -18,7 +19,7 @@ const ALLOWED_REDIRECT_URIS = [
 // ─── PENDING TOKENS STORE (for polling-based native auth) ───
 // The native app generates a session_id, passes it as `state` to Strava.
 // After callback, the JWT is stored here. The app polls /poll?state=<id> to retrieve it.
-const pendingTokens = new Map<string, { token: string; is_new_user: boolean; athlete_name: string; created: number }>();
+const pendingTokens = new Map<string, { token: string; refresh_token: string; is_new_user: boolean; athlete_name: string; created: number }>();
 
 // Clean up expired tokens every 5 minutes (tokens expire after 5 min)
 setInterval(() => {
@@ -117,8 +118,8 @@ router.get('/', async (req: Request, res: Response) => {
             city = $6
           WHERE user_id = $7`,
                     [
-                        access_token,
-                        refresh_token,
+                        encryptToken(access_token),
+                        encryptToken(refresh_token),
                         new Date(expires_at * 1000).toISOString(),
                         currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
                         currentProfile.rows[0]?.avatar_url || athlete.profile,
@@ -156,8 +157,8 @@ router.get('/', async (req: Request, res: Response) => {
                         [
                             userId,
                             athlete.id.toString(),
-                            access_token,
-                            refresh_token,
+                            encryptToken(access_token),
+                            encryptToken(refresh_token),
                             new Date(expires_at * 1000).toISOString(),
                             `${athlete.firstname} ${athlete.lastname}`,
                             athlete.profile,
@@ -203,8 +204,8 @@ router.get('/', async (req: Request, res: Response) => {
                         [
                             userId,
                             athlete.id.toString(),
-                            access_token,
-                            refresh_token,
+                            encryptToken(access_token),
+                            encryptToken(refresh_token),
                             new Date(expires_at * 1000).toISOString(),
                             `${athlete.firstname} ${athlete.lastname}`,
                             athlete.profile,
@@ -240,10 +241,19 @@ router.get('/', async (req: Request, res: Response) => {
                 role,
             });
 
+            // Generate refresh token
+            const refreshToken = generateRefreshToken();
+            const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+            await pool.query(
+                `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+                [userId, refreshToken, refreshExpiresAt.toISOString()]
+            );
+
             return res.json({
                 success: true,
                 user_id: userId,
                 token,
+                refresh_token: refreshToken,
                 is_new_user: isNewUser,
                 athlete: {
                     id: athlete.id,
@@ -287,7 +297,7 @@ router.get('/', async (req: Request, res: Response) => {
                 body: JSON.stringify({
                     client_id: STRAVA_CLIENT_ID,
                     client_secret: STRAVA_CLIENT_SECRET,
-                    refresh_token: profile.rows[0].strava_refresh_token,
+                    refresh_token: decryptToken(profile.rows[0].strava_refresh_token),
                     grant_type: 'refresh_token',
                 }),
             });
@@ -304,7 +314,7 @@ router.get('/', async (req: Request, res: Response) => {
           strava_refresh_token = $2,
           strava_token_expires_at = $3
         WHERE user_id = $4`,
-                [access_token, new_refresh_token, new Date(new_expires_at * 1000).toISOString(), jwtPayload.user_id]
+                [encryptToken(access_token), encryptToken(new_refresh_token), new Date(new_expires_at * 1000).toISOString(), jwtPayload.user_id]
             );
 
             return res.json({ success: true });
@@ -375,7 +385,7 @@ router.get('/callback', async (req: Request, res: Response) => {
                     city = $6
                 WHERE user_id = $7`,
                 [
-                    access_token, refresh_token,
+                    encryptToken(access_token), encryptToken(refresh_token),
                     new Date(expires_at * 1000).toISOString(),
                     currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
                     currentProfile.rows[0]?.avatar_url || athlete.profile,
@@ -397,7 +407,7 @@ router.get('/callback', async (req: Request, res: Response) => {
                     ON CONFLICT (user_id) DO UPDATE SET
                         strava_id = $2, strava_access_token = $3, strava_refresh_token = $4,
                         strava_token_expires_at = $5, display_name = $6, avatar_url = $7, city = $8`,
-                    [userId, athlete.id.toString(), access_token, refresh_token,
+                    [userId, athlete.id.toString(), encryptToken(access_token), encryptToken(refresh_token),
                         new Date(expires_at * 1000).toISOString(),
                         `${athlete.firstname} ${athlete.lastname}`, athlete.profile, athlete.city || null]
                 );
@@ -413,7 +423,7 @@ router.get('/callback', async (req: Request, res: Response) => {
                 await pool.query(
                     `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                    [userId, athlete.id.toString(), access_token, refresh_token,
+                    [userId, athlete.id.toString(), encryptToken(access_token), encryptToken(refresh_token),
                         new Date(expires_at * 1000).toISOString(),
                         `${athlete.firstname} ${athlete.lastname}`, athlete.profile, athlete.city || null]
                 );
@@ -427,12 +437,20 @@ router.get('/callback', async (req: Request, res: Response) => {
         const role = roleResult.rows[0]?.role || 'member';
         const token = signToken({ user_id: userId, email: `strava_${athlete.id}@eroderunners.local`, role });
 
+        // Generate refresh token
+        const refreshToken = generateRefreshToken();
+        const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        await pool.query(
+            `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+            [userId, refreshToken, refreshExpiresAt.toISOString()]
+        );
 
         // Store token for polling — the app will retrieve it via GET /poll?state=<id>
         const state = (req.query.state as string) || '';
         if (state) {
             pendingTokens.set(state, {
                 token,
+                refresh_token: refreshToken,
                 is_new_user: isNewUser,
                 athlete_name: athlete.firstname || 'Runner',
                 created: Date.now(),
@@ -481,6 +499,7 @@ router.get('/poll', (req: Request, res: Response) => {
     return res.json({
         ready: true,
         token: pending.token,
+        refresh_token: pending.refresh_token,
         is_new_user: pending.is_new_user,
         athlete_name: pending.athlete_name,
     });

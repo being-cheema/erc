@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_SUPABASE_URL || '';
 
 class ApiClient {
   private tokenListeners: Set<(token: string | null) => void> = new Set();
+  private refreshPromise: Promise<boolean> | null = null;
 
   getToken(): string | null {
     return localStorage.getItem('auth_token');
@@ -15,8 +16,17 @@ class ApiClient {
     this.notifyListeners(token);
   }
 
+  getRefreshToken(): string | null {
+    return localStorage.getItem('refresh_token');
+  }
+
+  setRefreshToken(token: string) {
+    localStorage.setItem('refresh_token', token);
+  }
+
   clearToken() {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     this.notifyListeners(null);
   }
 
@@ -30,9 +40,10 @@ class ApiClient {
     if (!token) return null;
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      // Check expiry
+      // Check expiry — try refresh if expired
       if (payload.exp && payload.exp * 1000 < Date.now()) {
-        this.clearToken();
+        // Don't clear immediately — let auto-refresh try first
+        this.tryRefresh();
         return null;
       }
       return { user_id: payload.user_id, email: payload.email, role: payload.role };
@@ -55,7 +66,46 @@ class ApiClient {
     this.tokenListeners.forEach(cb => cb(token));
   }
 
-  // Core fetch method
+  // Auto-refresh JWT using refresh token
+  async tryRefresh(): Promise<boolean> {
+    // Deduplicate concurrent refresh attempts
+    if (this.refreshPromise) return this.refreshPromise;
+
+    this.refreshPromise = (async () => {
+      const refreshToken = this.getRefreshToken();
+      if (!refreshToken) {
+        this.clearToken();
+        return false;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+
+        if (!response.ok) {
+          this.clearToken();
+          return false;
+        }
+
+        const data = await response.json();
+        this.setToken(data.token);
+        this.setRefreshToken(data.refresh_token);
+        return true;
+      } catch {
+        this.clearToken();
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  // Core fetch method with auto-refresh on 401
   async fetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -72,10 +122,14 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      this.clearToken();
-      // Don't hard-redirect — let AuthRouter handle navigation.
-      // Hard redirect here causes a race condition: after re-login,
-      // stale cached requests can return 401 and wipe the fresh token.
+      // Try auto-refresh before giving up
+      const refreshed = await this.tryRefresh();
+      if (refreshed) {
+        // Retry the request with the new token
+        const newHeaders = { ...headers, Authorization: `Bearer ${this.getToken()}` };
+        const retryResponse = await fetch(`${API_BASE}${path}`, { ...options, headers: newHeaders });
+        if (retryResponse.ok) return retryResponse.json();
+      }
       throw new Error('Session expired');
     }
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { generalLimiter, authLimiter } from './middleware/api-rate-limit.js';
 import pool from './db.js';
 
 // Routes
@@ -17,11 +18,13 @@ import trainingRouter from './routes/training.js';
 import adminRouter from './routes/admin.js';
 import notificationsRouter from './routes/notifications.js';
 import webhookRouter from './routes/webhook.js';
+import refreshRouter from './routes/refresh.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
 
 // Middleware
+app.set('trust proxy', 1); // Behind Nginx reverse proxy
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
     origin: [
@@ -33,14 +36,17 @@ app.use(cors({
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(generalLimiter);
 
-// Request logger (for debugging)
-app.use((req, _res, next) => {
-    if (req.path !== '/health') {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1]?.slice(0, 50) : ''}`);
-    }
-    next();
-});
+// Request logger — minimal in production
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, _res, next) => {
+        if (req.path !== '/health') {
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+        }
+        next();
+    });
+}
 
 // Health check
 app.get('/health', async (_req, res) => {
@@ -53,9 +59,10 @@ app.get('/health', async (_req, res) => {
 });
 
 // Edge Function compatible routes (same paths as Supabase)
-app.use('/functions/v1/strava-auth', stravaAuthRouter);
+app.use('/functions/v1/strava-auth', authLimiter, stravaAuthRouter);
 app.use('/functions/v1/sync-strava', syncStravaRouter);
 app.use('/functions/v1/disconnect-strava', disconnectStravaRouter);
+app.use('/api/auth/refresh', authLimiter, refreshRouter);
 
 // REST API routes
 app.use('/api/profiles', profilesRouter);
