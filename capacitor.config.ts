@@ -34,9 +34,9 @@ const config: CapacitorConfig = {
       useDialog: true,
     },
     StatusBar: {
-      style: 'dark',
+      style: 'light',
       backgroundColor: '#0a0a0a',
-      overlaysWebView: false,
+      overlaysWebView: true,
     },
     Keyboard: {
       resize: 'body',
@@ -50,7 +50,7 @@ const config: CapacitorConfig = {
     },
   },
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     preferredContentMode: 'mobile',
     scheme: 'eroderunners',
     limitsNavigationsToAppBoundDomains: true,
