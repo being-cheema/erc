@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useProfile";
 
 export interface Activity {
@@ -20,8 +20,8 @@ export interface Activity {
   average_heartrate: number | null;
   max_heartrate: number | null;
   suffer_score: number | null;
-  kudos_count: number;
-  achievement_count: number;
+  kudos_count: number | null;
+  achievement_count: number | null;
   description: string | null;
   workout_type: number | null;
   gear_id: string | null;
@@ -29,138 +29,67 @@ export interface Activity {
 }
 
 export function useActivities(limit?: number) {
-  const { data: user } = useCurrentUser();
-
+  const { user } = useCurrentUser();
   return useQuery({
-    queryKey: ["activities", user?.id, limit],
+    queryKey: ['activities', user?.user_id, limit],
     queryFn: async () => {
-      if (!user?.id) return [];
-
-      let query = supabase
-        .from("activities")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("start_date", { ascending: false });
-
-      if (limit) {
-        query = query.limit(limit);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as Activity[];
+      const params = limit ? `?limit=${limit}` : '';
+      return api.get<Activity[]>(`/api/activities${params}`);
     },
-    enabled: !!user?.id,
+    enabled: !!user,
   });
 }
 
-export function useRecentActivities() {
-  return useActivities(15);
+export function useRecentActivities(limit: number = 15) {
+  return useActivities(limit);
 }
 
-export function useMonthlyActivities() {
-  const { data: user } = useCurrentUser();
+export function useAllActivities() {
+  return useActivities();
+}
+
+export function useMonthActivities() {
+  const { user } = useCurrentUser();
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
 
   return useQuery({
-    queryKey: ["monthlyActivities", user?.id],
+    queryKey: ['activities', 'monthly', user?.user_id],
     queryFn: async () => {
-      if (!user?.id) return [];
-
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const { data, error } = await supabase
-        .from("activities")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("start_date", startOfMonth.toISOString())
-        .order("start_date", { ascending: false });
-
-      if (error) throw error;
-      return data as Activity[];
+      return api.get<Activity[]>(`/api/activities?after=${startOfMonth.toISOString()}`);
     },
-    enabled: !!user?.id,
+    enabled: !!user,
   });
+}
+
+// Alias used by some components
+export const useMonthlyActivities = useMonthActivities;
+
+// ── Utility functions ──
+export function formatPace(paceInSecondsPerKm: number | null | undefined): string {
+  if (!paceInSecondsPerKm || paceInSecondsPerKm <= 0) return '--:--';
+  const minutes = Math.floor(paceInSecondsPerKm / 60);
+  const seconds = Math.round(paceInSecondsPerKm % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function formatDuration(seconds: number | null | undefined): string {
+  if (!seconds || seconds <= 0) return '0:00';
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.round(seconds % 60);
+  if (hours > 0) return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export function useWeeklyStats() {
-  const { data: user } = useCurrentUser();
-
+  const { user } = useCurrentUser();
   return useQuery({
-    queryKey: ["weeklyStats", user?.id],
+    queryKey: ['activities', 'weekly', user?.user_id],
     queryFn: async () => {
-      if (!user?.id) return [];
-
-      // Get last 8 weeks of data for chart
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 56); // 8 weeks back
-
-      const { data, error } = await supabase
-        .from("activities")
-        .select("distance, start_date")
-        .eq("user_id", user.id)
-        .gte("start_date", startDate.toISOString())
-        .order("start_date", { ascending: true });
-
-      if (error) throw error;
-
-      // Group by week
-      const weeklyData: { week: string; distance: number; runs: number }[] = [];
-      const weeks = new Map<string, { distance: number; runs: number }>();
-
-      (data as { distance: number; start_date: string }[]).forEach((activity) => {
-        const date = new Date(activity.start_date);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split("T")[0];
-
-        if (!weeks.has(weekKey)) {
-          weeks.set(weekKey, { distance: 0, runs: 0 });
-        }
-        const week = weeks.get(weekKey)!;
-        week.distance += activity.distance;
-        week.runs += 1;
-      });
-
-      // Convert to array and format
-      const sortedWeeks = Array.from(weeks.entries())
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .slice(-8);
-
-      sortedWeeks.forEach(([weekKey, stats]) => {
-        const date = new Date(weekKey);
-        const monthDay = `${date.getMonth() + 1}/${date.getDate()}`;
-        weeklyData.push({
-          week: monthDay,
-          distance: Math.round(stats.distance / 1000 * 10) / 10,
-          runs: stats.runs,
-        });
-      });
-
-      return weeklyData;
+      return api.get(`/api/activities/weekly`);
     },
-    enabled: !!user?.id,
+    enabled: !!user,
   });
-}
-
-// Format pace as min:sec per km
-export function formatPace(paceInSecondsPerKm: number | null): string {
-  if (!paceInSecondsPerKm) return "--:--";
-  const minutes = Math.floor(paceInSecondsPerKm / 60);
-  const seconds = Math.floor(paceInSecondsPerKm % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-// Format duration as h:mm:ss or mm:ss
-export function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }

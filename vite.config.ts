@@ -7,7 +7,8 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173,
+    allowedHosts: ['api.eroderunnersclub.com', 'eroderunnersclub.com'],
     hmr: {
       overlay: false,
     },
@@ -18,5 +19,18 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
+  },
+  optimizeDeps: {
+    include: [
+      "@capacitor/core",
+      "@capacitor/app",
+      "@capacitor/browser",
+      "@capacitor/haptics",
+      "@capacitor/keyboard",
+      "@capacitor/push-notifications",
+      "@capacitor/share",
+      "@capacitor/splash-screen",
+      "@capacitor/status-bar",
+    ],
   },
 }));

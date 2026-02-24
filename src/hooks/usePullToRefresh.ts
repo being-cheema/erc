@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -15,34 +14,22 @@ export const usePullToRefresh = (onRefreshComplete?: () => void) => {
   const syncStrava = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to sync");
-        notificationError();
-        return;
-      }
-
-      const response = await supabase.functions.invoke("sync-strava", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.error) {
-        throw response.error;
-      }
-
-      toast.success("Strava data synced successfully!");
-      notificationSuccess();
+      // Just refresh data from our DB — the scheduler handles Strava syncing
+      // This saves API budget (no Strava calls needed)
       onRefreshComplete?.();
+      toast.success("Data refreshed!");
+      notificationSuccess();
     } catch (error: any) {
-      console.error("Sync error:", error);
-      toast.error(error.message || "Failed to sync Strava data");
+      console.error("Refresh error:", error);
+      toast.error("Failed to refresh data");
       notificationError();
     } finally {
-      setIsRefreshing(false);
-      setPullDistance(0);
-      hasTriggeredHaptic.current = false;
+      // Small delay so the spinner feels natural
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+        hasTriggeredHaptic.current = false;
+      }, 500);
     }
   }, [onRefreshComplete, notificationSuccess, notificationError]);
 
@@ -55,14 +42,14 @@ export const usePullToRefresh = (onRefreshComplete?: () => void) => {
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (containerRef.current?.scrollTop !== 0 || isRefreshing) return;
-    
+
     const currentY = e.touches[0].clientY;
     const diff = currentY - startY.current;
-    
+
     if (diff > 0) {
       const newDistance = Math.min(diff * 0.5, threshold * 1.5);
       setPullDistance(newDistance);
-      
+
       // Trigger haptic when crossing threshold
       if (newDistance >= threshold && !hasTriggeredHaptic.current) {
         selectionChanged();

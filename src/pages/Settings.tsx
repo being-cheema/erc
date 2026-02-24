@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import { useProfile, useCurrentUser } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,7 +38,7 @@ interface NotificationPreferences {
 const Settings = () => {
   const navigate = useNavigate();
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: user } = useCurrentUser();
+  const { user } = useCurrentUser();
   const { theme, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
   const { lightImpact, mediumImpact, selectionChanged, notificationSuccess } = useHaptics();
@@ -55,15 +55,7 @@ const Settings = () => {
   const { data: notifications, isLoading: notificationsLoading } = useQuery({
     queryKey: ["notificationPreferences"],
     queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
+      return api.get('/api/notifications/preferences');
     },
     enabled: !!user?.id,
   });
@@ -99,17 +91,11 @@ const Settings = () => {
   const updateProfileMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          display_name: displayName,
-          avatar_url: avatarUrl,
-          monthly_distance_goal: monthlyGoal * 1000, // Convert km to meters
-        })
-        .eq("user_id", user.id);
-      
-      if (error) throw error;
+      return api.put('/api/profiles/me', {
+        display_name: displayName,
+        avatar_url: avatarUrl,
+        monthly_distance_goal: monthlyGoal * 1000,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -123,15 +109,7 @@ const Settings = () => {
   const updateNotificationsMutation = useMutation({
     mutationFn: async (prefs: NotificationPreferences) => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      const { error } = await supabase
-        .from("notification_preferences")
-        .upsert({
-          user_id: user.id,
-          ...prefs,
-        }, { onConflict: "user_id" });
-      
-      if (error) throw error;
+      return api.put('/api/notifications/preferences', prefs);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notificationPreferences"] });
@@ -171,48 +149,7 @@ const Settings = () => {
     mediumImpact();
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error("Not authenticated");
-
-      // Call edge function to delete rows the user can't delete via RLS
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/disconnect-strava`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Failed to delete data");
-      }
-
-      // Delete rows the user CAN delete client-side
-      if (user?.id) {
-        await supabase.from("race_participants").delete().eq("user_id", user.id);
-        await supabase.from("user_training_progress").delete().eq("user_id", user.id);
-        await supabase.from("push_tokens").delete().eq("user_id", user.id);
-      }
-
-      // Clear Strava credentials + reset stats on profile
-      await supabase
-        .from("profiles")
-        .update({
-          strava_id: null,
-          strava_access_token: null,
-          strava_refresh_token: null,
-          strava_token_expires_at: null,
-          total_distance: 0,
-          total_runs: 0,
-          current_streak: 0,
-          longest_streak: 0,
-          last_synced_at: null,
-        })
-        .eq("user_id", user!.id);
+      await api.post('/functions/v1/disconnect-strava');
 
       // Invalidate all queries
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -226,7 +163,7 @@ const Settings = () => {
       toast.success("Strava disconnected and all data removed");
 
       // Sign out
-      await supabase.auth.signOut();
+      api.clearToken();
       navigate("/login");
     } catch (error: any) {
       console.error("Disconnect error:", error);
@@ -236,7 +173,6 @@ const Settings = () => {
   };
 
   const handleForceSync = async () => {
-    // SECURITY: Check strava_id (safe to expose) instead of strava_access_token
     if (!profile?.strava_id) {
       toast.error("No Strava connection found");
       return;
@@ -246,29 +182,7 @@ const Settings = () => {
     mediumImpact();
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava?force_full_sync=true`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Sync failed");
-      }
+      const result = await api.post('/functions/v1/sync-strava', { force_full_sync: true });
 
       await queryClient.invalidateQueries({ queryKey: ["activities"] });
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -277,13 +191,19 @@ const Settings = () => {
       await queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
 
       notificationSuccess();
-      toast.success(`Synced ${result.synced || 0} activities`);
+      const syncedCount = result.results?.[0]?.activities || 0;
+      toast.success(`Synced ${syncedCount} activities`);
     } catch (error: any) {
       console.error("Force sync error:", error);
       toast.error(error.message || "Failed to sync");
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleSignOut = () => {
+    api.clearToken();
+    navigate("/login");
   };
 
   if (profileLoading) {
@@ -460,9 +380,8 @@ const Settings = () => {
               ].map((item, index) => (
                 <div
                   key={item.key}
-                  className={`flex items-center justify-between ${
-                    index < 4 ? "pb-4 border-b border-border/50" : ""
-                  }`}
+                  className={`flex items-center justify-between ${index < 4 ? "pb-4 border-b border-border/50" : ""
+                    }`}
                 >
                   <div>
                     <p className="font-medium text-foreground">{item.label}</p>
@@ -605,10 +524,7 @@ const Settings = () => {
           <Button
             variant="outline"
             className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate("/login");
-            }}
+            onClick={handleSignOut}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out

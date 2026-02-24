@@ -1,39 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import { api } from "@/integrations/supabase/client";
 
-export type BlogPost = Tables<"blog_posts">;
-
-export const useBlogPosts = () => {
+export function useBlogPosts() {
   return useQuery({
-    queryKey: ["blog_posts"],
+    queryKey: ['blog-posts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("blog_posts")
-        .select("*")
-        .eq("is_published", true)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as BlogPost[];
+      return api.get('/api/blog');
     },
   });
-};
+}
 
-export const useBlogPost = (slug: string) => {
+export function useBlogPost(slug: string | undefined) {
   return useQuery({
-    queryKey: ["blog_post", slug],
+    queryKey: ['blog-post', slug],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("blog_posts")
-        .select("*")
-        .eq("slug", slug)
-        .eq("is_published", true)
-        .single();
-
-      if (error) throw error;
-      return data as BlogPost;
+      return api.get(`/api/blog/${slug}`);
     },
     enabled: !!slug,
   });
-};
+}
