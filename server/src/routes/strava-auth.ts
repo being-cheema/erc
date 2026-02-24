@@ -416,9 +416,47 @@ router.get('/callback', async (req: Request, res: Response) => {
 
         console.log(`[strava-auth] Native callback: redirecting to deep link for user ${userId}`);
 
-        // Redirect to native app with JWT in the deep link
+        // Build the deep link URL
         const deepLink = `eroderunners://auth/callback?token=${encodeURIComponent(token)}&is_new_user=${isNewUser}&athlete_name=${encodeURIComponent(athlete.firstname || 'Runner')}`;
-        return res.redirect(302, deepLink);
+
+        // Serve an HTML page that auto-redirects via JavaScript.
+        // Chrome Custom Tabs BLOCK 302 redirects to custom URL schemes (no user gesture).
+        // JavaScript window.location.href follows the user gesture chain and is allowed.
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Redirecting...</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; display: flex; align-items: center;
+         justify-content: center; min-height: 100vh; margin: 0; background: #111; color: #fff; }
+  .card { text-align: center; padding: 2rem; }
+  .btn { display: inline-block; margin-top: 1.5rem; padding: 14px 32px; background: #fc4c02;
+         color: #fff; font-size: 16px; font-weight: 600; border: none; border-radius: 12px;
+         text-decoration: none; cursor: pointer; }
+  .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
+             border-top-color: #fc4c02; border-radius: 50%; animation: spin 0.8s linear infinite;
+             margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<script>
+  // Auto-redirect via JS — Chrome allows this unlike 302 redirects
+  window.location.href = ${JSON.stringify(deepLink)};
+  // Fallback: show the button after a short delay if redirect didn't work
+  setTimeout(function() {
+    document.getElementById('fallback').style.display = 'block';
+    document.getElementById('spinner').style.display = 'none';
+  }, 1500);
+</script>
+</head><body>
+<div class="card">
+  <div class="spinner" id="spinner"></div>
+  <p>Returning to Erode Runners...</p>
+  <div id="fallback" style="display:none">
+    <p style="color:#999;font-size:14px">If the app didn't open automatically:</p>
+    <a class="btn" href="${deepLink}">Open App</a>
+  </div>
+</div>
+</body></html>`);
     } catch (error) {
         console.error('[strava-auth] Native callback error:', error);
         return res.status(500).send('Authentication failed. Please try again.');
