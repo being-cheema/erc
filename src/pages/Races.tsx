@@ -22,6 +22,13 @@ const Races = () => {
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const selectedRace = races?.find(r => r.id === selectedRaceId) ?? null;
 
+  // Ensure external URLs have a protocol — prevents window.open
+  // from treating "google.com" as a relative path
+  const openExternalUrl = (url: string) => {
+    const fullUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+    window.open(fullUrl, "_blank");
+  };
+
   const handleRegister = async (raceId: string, isRegistered: boolean) => {
     try {
       if (isRegistered) {
@@ -83,8 +90,8 @@ const Races = () => {
               <Card className="overflow-hidden border-border">
                 {race.image_url && (
                   <div className="h-36 bg-muted relative">
-                    <img 
-                      src={race.image_url} 
+                    <img
+                      src={race.image_url}
                       alt={race.name}
                       className="w-full h-full object-cover"
                     />
@@ -147,7 +154,7 @@ const Races = () => {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => window.open(race.registration_url!, "_blank")}
+                        onClick={() => openExternalUrl(race.registration_url!)}
                         className="shrink-0"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -194,8 +201,8 @@ const Races = () => {
             </TabsList>
 
             <TabsContent value="calendar" className="mt-4">
-              <RaceCalendar 
-                races={races || []} 
+              <RaceCalendar
+                races={races || []}
                 onRaceSelect={(race) => setSelectedRaceId(race?.id ?? null)}
               />
             </TabsContent>
@@ -215,12 +222,12 @@ const Races = () => {
               <SheetHeader className="text-left">
                 <SheetTitle className="text-xl font-black uppercase tracking-tight">{selectedRace.name}</SheetTitle>
               </SheetHeader>
-              
+
               <div className="mt-6 space-y-4">
                 {selectedRace.image_url && (
                   <div className="h-48 overflow-hidden bg-muted">
-                    <img 
-                      src={selectedRace.image_url} 
+                    <img
+                      src={selectedRace.image_url}
                       alt={selectedRace.name}
                       className="w-full h-full object-cover"
                     />
@@ -289,7 +296,7 @@ const Races = () => {
                     <Button
                       variant="outline"
                       className="h-12"
-                      onClick={() => window.open(selectedRace.registration_url!, "_blank")}
+                      onClick={() => openExternalUrl(selectedRace.registration_url!)}
                     >
                       External Link
                       <ChevronRight className="w-4 h-4 ml-2" />
