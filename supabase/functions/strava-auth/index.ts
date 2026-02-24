@@ -6,6 +6,8 @@ const ALLOWED_ORIGINS = [
   "https://7b78d716-a91e-4441-86b0-b30684e91214.lovable.app",
   "https://strava-runners-connect.lovable.app",
   "https://preview--strava-runners-connect.lovable.app",
+  // Production (OTA mode — Capacitor loads from this origin)
+  "https://api.eroderunnersclub.com",
 ];
 
 // Add localhost for development if needed
@@ -31,6 +33,9 @@ const ALLOWED_REDIRECT_URIS = [
   "https://strava-runners-connect.lovable.app/strava-callback",
   "https://preview--strava-runners-connect.lovable.app/auth/callback",
   "https://preview--strava-runners-connect.lovable.app/strava-callback",
+  // Production (native app uses https + source=native param, then bounces to deep link)
+  "https://api.eroderunnersclub.com/auth/callback",
+  "https://api.eroderunnersclub.com/auth/callback?source=native",
 ];
 
 if (Deno.env.get("ENVIRONMENT") === "development") {

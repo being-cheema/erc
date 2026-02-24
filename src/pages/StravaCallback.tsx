@@ -30,6 +30,17 @@ const StravaCallback = () => {
   const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
     const error = searchParams.get("error");
+    const source = searchParams.get("source");
+
+    // When running inside the in-app browser after a native Strava redirect,
+    // bounce back to the app via the custom URL scheme so the native WebView handles the callback.
+    if (source === "native" && code) {
+      const { Capacitor } = await import("@capacitor/core");
+      if (!Capacitor.isNativePlatform()) {
+        window.location.href = `eroderunners://auth/callback?code=${encodeURIComponent(code)}`;
+        return;
+      }
+    }
 
     // Prevent double processing - Strava codes are single-use
     if (isProcessing.current) {

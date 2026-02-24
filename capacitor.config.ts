@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   // Deploy web updates to your server = instant update for all users.
   // Only rebuild APK when native plugins or this config change.
   server: {
-    url: 'https://your-domain.com', // TODO: Replace with your actual self-hosted domain
+    url: 'https://api.eroderunnersclub.com/', // TODO: Replace with your actual self-hosted domain
     cleartext: false,
   },
 

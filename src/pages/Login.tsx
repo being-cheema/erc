@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
-import { useState, forwardRef } from "react";
+import { useState, useEffect, forwardRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg
@@ -18,20 +21,61 @@ StravaIcon.displayName = "StravaIcon";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Listen for the deep link return from the in-app browser (native only)
+  useEffect(() => {
+    let listener: { remove: () => void } | null = null;
+
+    const setup = async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        listener = await App.addListener("appUrlOpen", async ({ url }) => {
+          if (url.includes("auth/callback")) {
+            await Browser.close();
+            const urlObj = new URL(url);
+            navigate(`/auth/callback?${urlObj.searchParams.toString()}`);
+          }
+        });
+      } catch {
+        // Not running on native platform
+      }
+    };
+
+    setup();
+    return () => { listener?.remove(); };
+  }, [navigate]);
 
   const handleStravaLogin = async () => {
     setIsLoading(true);
     try {
-      const redirectUri = `${window.location.origin}/auth/callback`;
+      const isNative = Capacitor.isNativePlatform();
+      // On native, append ?source=native so StravaCallback can bounce back via deep link.
+      // window.location.origin on native = https://api.eroderunnersclub.com (OTA server URL)
+      const redirectUri = isNative
+        ? `${window.location.origin}/auth/callback?source=native`
+        : `${window.location.origin}/auth/callback`;
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`;
-      
+
       const response = await fetch(functionUrl);
       const data = await response.json();
-      
+
       if (data.url) {
-        window.location.href = data.url;
+        if (isNative) {
+          console.log("Opening in-app browser (native):", data.url);
+          try {
+            await Browser.open({ url: data.url });
+          } catch (browserError) {
+            console.error("Browser.open failed:", browserError);
+            // Fallback: open in external browser so the flow still works
+            window.open(data.url, "_system");
+          }
+          // setIsLoading(false) happens in the appUrlOpen listener after redirect
+        } else {
+          window.location.href = data.url;
+        }
       } else {
-        console.error("No auth URL received");
+        console.error("No auth URL received:", data.error);
         setIsLoading(false);
       }
     } catch (error) {
