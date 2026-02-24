@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/supabase/client";
 
 /**
  * Hook to handle Capacitor app lifecycle events.
- * Refreshes the auth session when the app resumes from background.
+ * Checks if the auth token is still valid when the app resumes from background.
  */
 export const useAppLifecycle = () => {
   useEffect(() => {
@@ -11,26 +11,15 @@ export const useAppLifecycle = () => {
 
     const setupCapacitorListeners = async () => {
       try {
-        // Dynamically import Capacitor App plugin
         const { App } = await import("@capacitor/app");
 
         appStateListener = await App.addListener("appStateChange", async ({ isActive }) => {
           if (isActive) {
-            // App came back to foreground - refresh session
-            // Only try to refresh if we have a session
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session) {
-              console.log("App resumed, refreshing session...");
-              const { error } = await supabase.auth.refreshSession();
-              if (error) {
-                // Only log non-missing session errors
-                if (error.name !== "AuthSessionMissingError") {
-                  console.error("Failed to refresh session:", error);
-                }
-              } else {
-                console.log("Session refreshed successfully");
-              }
+            // App came back to foreground — check if token is still valid
+            const user = api.getUser();
+            if (!user) {
+              // Token expired or missing — redirect to login
+              window.location.href = '/login';
             }
           }
         });

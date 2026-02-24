@@ -1,85 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useCurrentUser } from "./useProfile";
+import { api } from "@/integrations/supabase/client";
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  category: string;
-  requirement_type: string;
-  requirement_value: number;
-  created_at: string;
-}
-
-export interface UserAchievement {
-  id: string;
-  achievement_id: string;
-  user_id: string;
-  unlocked_at: string;
-  achievement?: Achievement;
-}
-
-export const useAchievements = () => {
+export function useAchievements() {
   return useQuery({
-    queryKey: ["achievements"],
+    queryKey: ['achievements'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("achievements")
-        .select("*")
-        .order("requirement_value", { ascending: true });
-
-      if (error) throw error;
-      return data as Achievement[];
+      return api.get('/api/achievements');
     },
   });
-};
+}
 
-export const useUserAchievements = () => {
-  const { data: user } = useCurrentUser();
-
+// Returns achievements with unlocked status for current user
+export function useAchievementsWithStatus() {
   return useQuery({
-    queryKey: ["userAchievements", user?.id],
+    queryKey: ['achievements-with-status'],
     queryFn: async () => {
-      if (!user?.id) return [];
+      const data = await api.get('/api/achievements');
+      const { achievements, userAchievements } = data;
+      const unlockedIds = new Set(userAchievements?.map((ua: any) => ua.achievement_id) || []);
 
-      const { data, error } = await supabase
-        .from("user_achievements")
-        .select(`
-          *,
-          achievements (*)
-        `)
-        .eq("user_id", user.id)
-        .order("unlocked_at", { ascending: false });
-
-      if (error) throw error;
-      
-      // Type assertion for the joined data
-      return data as unknown as (UserAchievement & { achievements: Achievement })[];
+      return achievements.map((ach: any) => ({
+        ...ach,
+        unlocked: unlockedIds.has(ach.id),
+        unlocked_at: userAchievements?.find((ua: any) => ua.achievement_id === ach.id)?.unlocked_at || null,
+      }));
     },
-    enabled: !!user?.id,
+    enabled: api.isAuthenticated(),
   });
-};
-
-export const useAchievementsWithStatus = () => {
-  const { data: allAchievements, isLoading: achievementsLoading } = useAchievements();
-  const { data: userAchievements, isLoading: userAchievementsLoading } = useUserAchievements();
-
-  const achievementsWithStatus = allAchievements?.map(achievement => {
-    const userAchievement = userAchievements?.find(
-      ua => ua.achievement_id === achievement.id
-    );
-    
-    return {
-      ...achievement,
-      unlocked: !!userAchievement,
-      unlocked_at: userAchievement?.unlocked_at,
-    };
-  });
-
-  return {
-    data: achievementsWithStatus,
-    isLoading: achievementsLoading || userAchievementsLoading,
-  };
-};
+}

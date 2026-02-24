@@ -1,57 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useProfile";
 
-export function useMonthlyDistance() {
-  const { data: user } = useCurrentUser();
+export function useMonthlyStats() {
+  const { user } = useCurrentUser();
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
 
   return useQuery({
-    queryKey: ["monthlyDistance", user?.id],
+    queryKey: ['monthly-stats', user?.user_id],
     queryFn: async () => {
-      if (!user?.id) return 0;
-
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      const { data, error } = await supabase
-        .from("activities")
-        .select("distance")
-        .eq("user_id", user.id)
-        .gte("start_date", startOfMonth.toISOString());
-
-      if (error) throw error;
-
-      const totalDistance = (data || []).reduce(
-        (sum, activity) => sum + (Number(activity.distance) || 0),
-        0
-      );
-
-      return totalDistance;
+      const activities = await api.get(`/api/activities?after=${startOfMonth.toISOString()}`);
+      if (!activities || !activities.length) {
+        return { totalDistance: 0, totalRuns: 0, totalCalories: 0, totalElevation: 0, totalMovingTime: 0 };
+      }
+      return {
+        totalDistance: activities.reduce((s: number, a: any) => s + Number(a.distance || 0), 0),
+        totalRuns: activities.length,
+        totalCalories: activities.reduce((s: number, a: any) => s + Number(a.calories || 0), 0),
+        totalElevation: activities.reduce((s: number, a: any) => s + Number(a.elevation_gain || 0), 0),
+        totalMovingTime: activities.reduce((s: number, a: any) => s + Number(a.moving_time || 0), 0),
+      };
     },
-    enabled: !!user?.id,
+    enabled: !!user,
   });
 }
 
-export function useMonthlyLeaderboardEntry() {
-  const { data: user } = useCurrentUser();
-
-  return useQuery({
-    queryKey: ["monthlyLeaderboardEntry", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-
-      const now = new Date();
-      const { data, error } = await supabase
-        .from("monthly_leaderboard")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("month", now.getMonth() + 1)
-        .eq("year", now.getFullYear())
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
-}
+// Alias used by some components
+export const useMonthlyDistance = useMonthlyStats;
