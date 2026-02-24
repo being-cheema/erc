@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
@@ -31,6 +32,14 @@ const Login = () => {
       if (url.includes("auth/callback")) {
         try { await Browser.close(); } catch { /* may already be closed */ }
         const urlObj = new URL(url);
+        const token = urlObj.searchParams.get("token");
+        if (token) {
+          // Store JWT and hard-redirect — bypasses React Router lifecycle issues
+          api.setToken(token);
+          window.location.href = "/home";
+          return;
+        }
+        // Fallback for web flow (code-based)
         navigate(`/auth/callback?${urlObj.searchParams.toString()}`);
       }
     };
