@@ -28,6 +28,13 @@ export function useAllTimeStats() {
       const avgPace = paces.length > 0 ? paces.reduce((s: number, p: number) => s + p, 0) / paces.length : 0;
       const fastestPace = paces.length > 0 ? Math.min(...paces) : 0;
 
+      const heartRates = activities
+        .filter((a: any) => a.average_heartrate && Number(a.average_heartrate) > 0)
+        .map((a: any) => Number(a.average_heartrate));
+      const avgHeartRate = heartRates.length > 0
+        ? Math.round(heartRates.reduce((s: number, h: number) => s + h, 0) / heartRates.length)
+        : null;
+
       return {
         totalDistance,
         totalRuns,
@@ -35,6 +42,7 @@ export function useAllTimeStats() {
         totalElevation,
         totalMovingTime,
         avgPace,
+        avgHeartRate,
         avgDistance: totalRuns > 0 ? totalDistance / totalRuns : 0,
         longestRun: Math.max(...activities.map((a: any) => Number(a.distance || 0))),
         fastestPace,
