@@ -15,6 +15,19 @@ const ALLOWED_REDIRECT_URIS = [
     'http://localhost:5173/auth/callback',
 ];
 
+// ─── PENDING TOKENS STORE (for polling-based native auth) ───
+// The native app generates a session_id, passes it as `state` to Strava.
+// After callback, the JWT is stored here. The app polls /poll?state=<id> to retrieve it.
+const pendingTokens = new Map<string, { token: string; is_new_user: boolean; athlete_name: string; created: number }>();
+
+// Clean up expired tokens every 5 minutes (tokens expire after 5 min)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of pendingTokens) {
+        if (now - val.created > 5 * 60 * 1000) pendingTokens.delete(key);
+    }
+}, 5 * 60 * 1000);
+
 router.get('/', async (req: Request, res: Response) => {
     try {
         const action = req.query.action as string;
@@ -37,6 +50,12 @@ router.get('/', async (req: Request, res: Response) => {
             stravaAuthUrl.searchParams.set('redirect_uri', redirectUri);
             stravaAuthUrl.searchParams.set('approval_prompt', 'auto');
             stravaAuthUrl.searchParams.set('scope', 'read,activity:read_all,profile:read_all');
+
+            // Forward state param (used for polling-based native auth)
+            const state = req.query.state as string;
+            if (state) {
+                stravaAuthUrl.searchParams.set('state', state);
+            }
 
             return res.json({ url: stravaAuthUrl.toString() });
         }
@@ -414,57 +433,64 @@ router.get('/callback', async (req: Request, res: Response) => {
         const role = roleResult.rows[0]?.role || 'member';
         const token = signToken({ user_id: userId, email: `strava_${athlete.id}@eroderunners.local`, role });
 
-        console.log(`[strava-auth] Native callback: redirecting to deep link for user ${userId}`);
+        console.log(`[strava-auth] Native callback: storing token for polling, user ${userId}`);
 
-        // Build the deep link URL
-        const deepLink = `eroderunners://auth/callback?token=${encodeURIComponent(token)}&is_new_user=${isNewUser}&athlete_name=${encodeURIComponent(athlete.firstname || 'Runner')}`;
+        // Store token for polling — the app will retrieve it via GET /poll?state=<id>
+        const state = (req.query.state as string) || '';
+        if (state) {
+            pendingTokens.set(state, {
+                token,
+                is_new_user: isNewUser,
+                athlete_name: athlete.firstname || 'Runner',
+                created: Date.now(),
+            });
+        }
 
-        // Build an Android intent:// URL — Chrome has native support for these
-        // and won't block them like custom schemes (eroderunners://)
-        const intentUrl = `intent://auth/callback?token=${encodeURIComponent(token)}&is_new_user=${isNewUser}&athlete_name=${encodeURIComponent(athlete.firstname || 'Runner')}#Intent;scheme=eroderunners;package=com.eroderunners.app;end`;
-
-        // Serve an HTML page that auto-redirects via intent:// scheme.
-        // Chrome Custom Tabs block both 302 redirects AND JS redirects to custom schemes,
-        // but intent:// is handled natively by Chrome.
+        // Show a simple page telling the user to return to the app
         res.setHeader('Content-Type', 'text/html');
         return res.send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Redirecting...</title>
+<title>Success</title>
 <style>
   body { font-family: -apple-system, system-ui, sans-serif; display: flex; align-items: center;
          justify-content: center; min-height: 100vh; margin: 0; background: #111; color: #fff; }
   .card { text-align: center; padding: 2rem; }
-  .btn { display: inline-block; margin-top: 1.5rem; padding: 14px 32px; background: #fc4c02;
-         color: #fff; font-size: 16px; font-weight: 600; border: none; border-radius: 12px;
-         text-decoration: none; cursor: pointer; }
-  .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
-             border-top-color: #fc4c02; border-radius: 50%; animation: spin 0.8s linear infinite;
-             margin: 0 auto 1rem; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .check { font-size: 48px; margin-bottom: 1rem; }
 </style>
-<script>
-  // Use intent:// scheme — Chrome handles this natively unlike custom schemes
-  window.location.href = ${JSON.stringify(intentUrl)};
-  // Fallback: show the button after a short delay
-  setTimeout(function() {
-    document.getElementById('fallback').style.display = 'block';
-    document.getElementById('spinner').style.display = 'none';
-  }, 2000);
-</script>
 </head><body>
 <div class="card">
-  <div class="spinner" id="spinner"></div>
-  <p>Returning to Erode Runners...</p>
-  <div id="fallback" style="display:none">
-    <p style="color:#999;font-size:14px">If the app didn't open automatically:</p>
-    <a class="btn" href="${deepLink}">Open App</a>
-  </div>
+  <div class="check">✅</div>
+  <p>Authentication successful!</p>
+  <p style="color:#999;font-size:14px">Returning to the app...</p>
 </div>
 </body></html>`);
     } catch (error) {
         console.error('[strava-auth] Native callback error:', error);
         return res.status(500).send('Authentication failed. Please try again.');
     }
+});
+
+// ─── POLL: Native app polls for the token after Strava auth ───
+router.get('/poll', (req: Request, res: Response) => {
+    const state = req.query.state as string;
+    if (!state) {
+        return res.status(400).json({ error: 'state is required' });
+    }
+
+    const pending = pendingTokens.get(state);
+    if (!pending) {
+        // Not ready yet — app should keep polling
+        return res.json({ ready: false });
+    }
+
+    // Token is ready — return it and delete from store (one-time use)
+    pendingTokens.delete(state);
+    return res.json({
+        ready: true,
+        token: pending.token,
+        is_new_user: pending.is_new_user,
+        athlete_name: pending.athlete_name,
+    });
 });
 
 export default router;

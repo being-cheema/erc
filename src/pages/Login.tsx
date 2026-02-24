@@ -72,12 +72,14 @@ const Login = () => {
     setIsLoading(true);
     try {
       const isNative = Capacitor.isNativePlatform();
-      // On native, Strava redirects to the server-side callback which does the full
-      // token exchange and redirects to eroderunners:// deep link with JWT.
       const redirectUri = isNative
         ? `${import.meta.env.VITE_SUPABASE_URL}/auth/strava/callback`
         : `${window.location.origin}/auth/callback`;
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      // Generate a random state ID for the polling flow (native only)
+      const stateId = isNative ? crypto.randomUUID() : '';
+      const stateParam = stateId ? `&state=${stateId}` : '';
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}${stateParam}`;
 
       const response = await fetch(functionUrl);
       const data = await response.json();
@@ -89,10 +91,37 @@ const Login = () => {
             await Browser.open({ url: data.url });
           } catch (browserError) {
             console.error("Browser.open failed:", browserError);
-            // Fallback: open in external browser so the flow still works
             window.open(data.url, "_system");
           }
-          // setIsLoading(false) happens in the appUrlOpen listener after redirect
+
+          // Poll the server for the token — no deep link dependency
+          const pollUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth/poll?state=${stateId}`;
+          const maxAttempts = 120; // 3 minutes max (120 * 1.5s)
+          let attempts = 0;
+
+          const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+              const pollRes = await fetch(pollUrl);
+              const pollData = await pollRes.json();
+
+              if (pollData.ready && pollData.token) {
+                clearInterval(pollInterval);
+                api.setToken(pollData.token);
+                try { await Browser.close(); } catch { /* may already be closed */ }
+                setIsLoading(false);
+                window.location.href = "/home";
+              }
+            } catch {
+              // Network error, keep polling
+            }
+
+            if (attempts >= maxAttempts) {
+              clearInterval(pollInterval);
+              setIsLoading(false);
+              console.error("Polling timed out");
+            }
+          }, 1500);
         } else {
           window.location.href = data.url;
         }
@@ -101,7 +130,7 @@ const Login = () => {
         setIsLoading(false);
       }
     } catch (error) {
-      console.error("Failed to initiate Strava login:", error);
+      console.error("Login error:", error);
       setIsLoading(false);
     }
   };
