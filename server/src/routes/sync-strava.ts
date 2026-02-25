@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
 import { verifyToken } from '../utils/jwt.js';
+import { encryptToken, decryptToken } from '../utils/crypto.js';
 import { recordCalls, canMakeCalls, updateFromHeaders, getUsageStats } from '../rate-limiter.js';
 
 const router = Router();
@@ -69,7 +70,7 @@ async function refreshToken(userId: string, refreshTokenValue: string): Promise<
 
         await pool.query(
             `UPDATE profiles SET strava_access_token = $1, strava_refresh_token = $2, strava_token_expires_at = $3 WHERE user_id = $4`,
-            [data.access_token, data.refresh_token, new Date(data.expires_at * 1000).toISOString(), userId]
+            [encryptToken(data.access_token), encryptToken(data.refresh_token), new Date(data.expires_at * 1000).toISOString(), userId]
         );
 
         return data.access_token;
@@ -330,7 +331,7 @@ router.all('/', async (req: Request, res: Response) => {
 
         for (const profile of profiles) {
             try {
-                let accessToken = profile.strava_access_token;
+                let accessToken = decryptToken(profile.strava_access_token);
                 if (!accessToken) {
                     results.push({ userId: profile.user_id, success: false, error: 'No access token' });
                     continue;
@@ -343,7 +344,7 @@ router.all('/', async (req: Request, res: Response) => {
                         results.push({ userId: profile.user_id, success: false, error: 'No refresh token' });
                         continue;
                     }
-                    accessToken = await refreshToken(profile.user_id, profile.strava_refresh_token);
+                    accessToken = await refreshToken(profile.user_id, decryptToken(profile.strava_refresh_token));
                     if (!accessToken) {
                         results.push({ userId: profile.user_id, success: false, error: 'Token refresh failed' });
                         continue;
