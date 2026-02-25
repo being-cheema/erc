@@ -77,9 +77,17 @@ const StravaCallback = () => {
       const userId = data.user_id;
       const isNewUser = data.is_new_user;
 
-      // Only trigger full sync for NEW users
-      // Returning users already have their data — skip to home
+      // Check if user has any activities (handles reconnect after disconnect)
+      let hasActivities = false;
       if (!isNewUser) {
+        try {
+          const activities = await api.get('/api/activities');
+          hasActivities = activities && activities.length > 0;
+        } catch { /* assume no activities */ }
+      }
+
+      // Skip sync only if returning user WITH existing data
+      if (!isNewUser && hasActivities) {
         setSyncState({
           step: "complete",
           message: `Welcome back, ${athleteName}!`,

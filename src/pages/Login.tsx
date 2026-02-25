@@ -91,7 +91,12 @@ const Login = () => {
                 api.setToken(pollData.token);
                 if (pollData.refresh_token) api.setRefreshToken(pollData.refresh_token);
                 try { await Browser.close(); } catch { /* may already be closed */ }
-                window.location.href = "/home";
+                // Navigate to sync screen if new user, otherwise home
+                if (pollData.is_new_user) {
+                  window.location.href = `/auth/callback-sync?athlete=${encodeURIComponent(pollData.athlete?.firstname || 'Runner')}&user_id=${pollData.user_id}`;
+                } else {
+                  window.location.href = "/home";
+                }
               }
             } catch {
               // Network error, keep polling
