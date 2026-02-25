@@ -39,68 +39,15 @@ const StravaCallback = () => {
     if (isNative) {
       isProcessing.current = true;
       const athleteName = searchParams.get("athlete_name") || "Runner";
-      const userId = searchParams.get("user_id") || "";
       const isNewUser = searchParams.get("is_new_user") === "1";
-      const token = searchParams.get("token") || api.getToken() || "";
 
       setSyncState({
-        step: "syncing",
+        step: "complete",
         message: isNewUser
-          ? `Welcome, ${athleteName}! Pulling your activities from Strava...`
-          : `Welcome back, ${athleteName}! Refreshing your data...`,
-        progress: 25,
+          ? `Welcome, ${athleteName}! Head to Settings to sync your activities.`
+          : `Welcome back, ${athleteName}!`,
+        progress: 100,
       });
-
-      // Fire sync request (fire-and-forget — server also triggers sync during auth)
-      const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
-      fetch(syncUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ user_id: userId, force_full_sync: true }),
-      }).catch(() => { });
-
-      // Poll for data until activities appear
-      const maxWaitMs = 90_000;
-      const pollIntervalMs = 3_000;
-      const startTime = Date.now();
-      let activitiesFound = 0;
-
-      while (Date.now() - startTime < maxWaitMs) {
-        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(25 + (elapsed / maxWaitMs) * 65, 85);
-        setSyncState(prev => ({
-          ...prev,
-          progress,
-          message: elapsed > 15_000
-            ? `Still syncing... this can take a minute for lots of activities`
-            : prev.message,
-        }));
-        try {
-          const profileRes = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/api/profile`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          if (profileRes.ok) {
-            const profile = await profileRes.json();
-            if (profile.total_runs && profile.total_runs > 0) {
-              activitiesFound = profile.total_runs;
-              break;
-            }
-          }
-        } catch { /* keep polling */ }
-      }
-
-      if (activitiesFound > 0) {
-        setSyncState({ step: "calculating", message: `Found ${activitiesFound} runs! Calculating your stats...`, activitiesFound, progress: 90 });
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setSyncState({ step: "complete", message: `You're all set, ${athleteName}!`, activitiesFound, progress: 100 });
-      } else {
-        setSyncState({ step: "complete", message: `Welcome, ${athleteName}! Your data is still syncing — it'll appear shortly.`, progress: 100 });
-      }
 
       await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/home");
@@ -151,82 +98,14 @@ const StravaCallback = () => {
       const userId = data.user_id;
       const isNewUser = data.is_new_user;
 
-      // Show sync screen immediately
+      // No auto-sync — users trigger sync manually via Force Sync in Settings
       setSyncState({
-        step: "syncing",
+        step: "complete",
         message: isNewUser
-          ? `Welcome, ${athleteName}! Pulling your activities from Strava...`
-          : `Welcome back, ${athleteName}! Refreshing your data...`,
-        progress: 25,
+          ? `Welcome, ${athleteName}! Head to Settings to sync your activities.`
+          : `Welcome back, ${athleteName}!`,
+        progress: 100,
       });
-
-      // Fire sync request (fire-and-forget — server also triggers sync during auth)
-      const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
-      fetch(syncUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
-        },
-        body: JSON.stringify({ user_id: userId, force_full_sync: true }),
-      }).catch(() => { }); // fire-and-forget
-
-      // Poll for data — wait until activities appear in the DB
-      const maxWaitMs = 90_000; // 90 seconds max
-      const pollIntervalMs = 3_000;
-      const startTime = Date.now();
-      let activitiesFound = 0;
-
-      while (Date.now() - startTime < maxWaitMs) {
-        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
-        // Update progress animation
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(25 + (elapsed / maxWaitMs) * 65, 85);
-        setSyncState(prev => ({
-          ...prev,
-          progress,
-          message: elapsed > 15_000
-            ? `Still syncing... this can take a minute for lots of activities`
-            : prev.message,
-        }));
-
-        try {
-          const profileRes = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/api/profile`,
-            { headers: { Authorization: `Bearer ${data.token}` } }
-          );
-          if (profileRes.ok) {
-            const profile = await profileRes.json();
-            if (profile.total_runs && profile.total_runs > 0) {
-              activitiesFound = profile.total_runs;
-              break;
-            }
-          }
-        } catch { /* keep polling */ }
-      }
-
-      if (activitiesFound > 0) {
-        setSyncState({
-          step: "calculating",
-          message: `Found ${activitiesFound} runs! Calculating your stats...`,
-          activitiesFound,
-          progress: 90,
-        });
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setSyncState({
-          step: "complete",
-          message: `You're all set, ${athleteName}!`,
-          activitiesFound,
-          progress: 100,
-        });
-      } else {
-        setSyncState({
-          step: "complete",
-          message: `Welcome, ${athleteName}! Your data is still syncing — it'll appear shortly.`,
-          progress: 100,
-        });
-      }
 
       await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/home");

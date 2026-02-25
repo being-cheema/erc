@@ -134,33 +134,8 @@ const Settings = () => {
     navigate(-1);
   };
 
-  const handleDisconnectStrava = async () => {
-    setIsDisconnecting(true);
-    mediumImpact();
 
-    try {
-      await api.post('/functions/v1/disconnect-strava');
 
-      // Invalidate all queries
-      await queryClient.invalidateQueries({ queryKey: ["profile"] });
-      await queryClient.invalidateQueries({ queryKey: ["activities"] });
-      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
-      await queryClient.invalidateQueries({ queryKey: ["userRank"] });
-      await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
-      await queryClient.invalidateQueries({ queryKey: ["userAchievements"] });
-
-      notificationSuccess();
-      toast.success("Strava disconnected and all data removed");
-
-      // Sign out
-      api.clearToken();
-      navigate("/login");
-    } catch (error: any) {
-      console.error("Disconnect error:", error);
-      toast.error(error.message || "Failed to disconnect Strava");
-      setIsDisconnecting(false);
-    }
-  };
 
   const handleForceSync = async () => {
     if (!profile?.strava_id) {
@@ -172,7 +147,7 @@ const Settings = () => {
     mediumImpact();
 
     try {
-      const result = await api.post('/functions/v1/sync-strava', { force_full_sync: true });
+      const result = await api.post('/functions/v1/sync-strava', { force_full_sync: false });
 
       await queryClient.invalidateQueries({ queryKey: ["activities"] });
       await queryClient.invalidateQueries({ queryKey: ["profile"] });

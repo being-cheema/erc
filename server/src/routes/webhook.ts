@@ -24,6 +24,18 @@ router.get('/', (req: Request, res: Response) => {
     return res.sendStatus(403);
 });
 
+// ── Deduplication: ignore rapid-fire events for the same activity ──
+const recentEvents = new Map<string, number>(); // key → timestamp
+const DEDUP_WINDOW_MS = 10_000; // 10 seconds
+
+// Clean up old entries every 5 minutes
+setInterval(() => {
+    const cutoff = Date.now() - DEDUP_WINDOW_MS;
+    for (const [key, ts] of recentEvents) {
+        if (ts < cutoff) recentEvents.delete(key);
+    }
+}, 5 * 60 * 1000);
+
 // ─── POST /webhook — Receive events from Strava ───
 // Must respond 200 within 2 seconds. Heavy work is done async.
 router.post('/', (req: Request, res: Response) => {
@@ -31,6 +43,15 @@ router.post('/', (req: Request, res: Response) => {
 
     // Respond immediately — Strava requires 200 within 2 seconds
     res.status(200).send('EVENT_RECEIVED');
+
+    // Deduplicate: skip if we already processed this exact event recently
+    const dedupeKey = `${event.object_type}:${event.object_id}:${event.aspect_type}`;
+    const lastSeen = recentEvents.get(dedupeKey);
+    if (lastSeen && Date.now() - lastSeen < DEDUP_WINDOW_MS) {
+        console.log(`[webhook] Dedup: skipping duplicate ${dedupeKey}`);
+        return;
+    }
+    recentEvents.set(dedupeKey, Date.now());
 
     // Process asynchronously
     processWebhookEvent(event).catch(err => {

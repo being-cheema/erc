@@ -2,21 +2,41 @@
  * Strava API Rate Limit Tracker
  * 
  * Limits: 300 reads/15min, 3,000 reads/day
- * With 999 users, we budget:
- *   - Scheduled sync: ~2,000 calls/day (2 per user)
- *   - Manual refresh:  ~500 calls/day  (reserve)
- *   - Safety buffer:   ~500 calls/day
+ * State is persisted to disk so restarts don't reset counters.
  */
+
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+
+const STATE_FILE = join(process.cwd(), '.rate-limit-state.json');
 
 interface RateLimitState {
     shortWindow: { count: number; resetAt: number };  // 15-min window
     dailyWindow: { count: number; resetAt: number };   // daily window
 }
 
-const state: RateLimitState = {
-    shortWindow: { count: 0, resetAt: Date.now() + 15 * 60 * 1000 },
-    dailyWindow: { count: 0, resetAt: getNextMidnightUTC() },
-};
+function loadState(): RateLimitState {
+    try {
+        const data = JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
+        // Validate loaded state is still relevant (not from a previous day)
+        const now = Date.now();
+        if (data.dailyWindow?.resetAt && data.dailyWindow.resetAt > now) {
+            return data;
+        }
+    } catch { /* file missing or corrupted, start fresh */ }
+    return {
+        shortWindow: { count: 0, resetAt: Date.now() + 15 * 60 * 1000 },
+        dailyWindow: { count: 0, resetAt: getNextMidnightUTC() },
+    };
+}
+
+function saveState() {
+    try {
+        writeFileSync(STATE_FILE, JSON.stringify(state), 'utf-8');
+    } catch { /* non-critical, just log */ }
+}
+
+const state: RateLimitState = loadState();
 
 function getNextMidnightUTC(): number {
     const now = new Date();
@@ -39,6 +59,7 @@ export function recordCalls(n: number = 1) {
     resetWindowsIfNeeded();
     state.shortWindow.count += n;
     state.dailyWindow.count += n;
+    saveState();
 }
 
 /** Update limits from Strava response headers (most accurate) */
@@ -50,6 +71,7 @@ export function updateFromHeaders(headers: Headers) {
         const [short, daily] = usage15.split(',').map(Number);
         state.shortWindow.count = short;
         state.dailyWindow.count = daily;
+        saveState();
     }
 }
 

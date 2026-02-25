@@ -150,7 +150,7 @@ async function fetchAllStravaActivities(accessToken: string): Promise<StravaActi
                 allActivities = [...allActivities, ...activities];
                 console.log(`Fetched page ${page}: ${activities.length} activities (total: ${allActivities.length})`);
                 page++;
-                if (page > 50) break;
+                if (page > 10) break; // Cap at 10 pages (2,000 activities) to protect API budget
             }
         } catch {
             break;
@@ -161,7 +161,7 @@ async function fetchAllStravaActivities(accessToken: string): Promise<StravaActi
 }
 
 // ── Fetch recent activity details with rate limiting ──
-async function fetchRecentActivityDetails(accessToken: string, activities: StravaActivity[], limit = 30): Promise<Map<number, StravaActivity>> {
+async function fetchRecentActivityDetails(accessToken: string, activities: StravaActivity[], limit = 5): Promise<Map<number, StravaActivity>> {
     const detailsMap = new Map<number, StravaActivity>();
     const recentActivities = activities.slice(0, limit);
 
@@ -393,7 +393,7 @@ router.all('/', async (req: Request, res: Response) => {
                     while (hasMore) {
                         const activities = await fetchStravaActivitiesPage(accessToken, page, afterTimestamp);
                         if (activities.length === 0) { hasMore = false; }
-                        else { newActivities = [...newActivities, ...activities]; page++; if (page > 20) break; }
+                        else { newActivities = [...newActivities, ...activities]; page++; if (page > 5) break; }
                     }
 
                     const newRuns = newActivities.filter(a => a.type === 'Run');
