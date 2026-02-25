@@ -215,7 +215,7 @@ async function recalculateUserStats(userId: string) {
     const totalRuns = allActivities.length;
 
     await pool.query(
-        `UPDATE profiles SET total_distance=$1, total_runs=$2, last_synced_at=$3 WHERE user_id=$4`,
+        `UPDATE profiles SET total_distance=$1, total_runs=$2, last_synced_at=$3, last_webhook_at=$3 WHERE user_id=$4`,
         [totalDistance, totalRuns, new Date().toISOString(), userId]
     );
 

@@ -69,6 +69,7 @@ CREATE TABLE public.profiles (
     friend_count INTEGER DEFAULT 0,
     premium BOOLEAN DEFAULT false,
     last_synced_at TIMESTAMPTZ,
+    last_webhook_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -172,9 +172,10 @@ export async function runScheduledSync() {
              FROM profiles
              WHERE strava_id IS NOT NULL
                AND (last_synced_at IS NULL OR last_synced_at < NOW() - INTERVAL '24 hours')
+               AND (last_webhook_at IS NULL OR last_webhook_at < NOW() - INTERVAL '48 hours')
              ORDER BY last_synced_at ASC NULLS FIRST
              LIMIT $1`,
-            [Math.min(budget, 999)] // Sync all users that fit within the budget
+            [Math.min(budget, 999)]
         );
 
         if (profiles.length === 0) {

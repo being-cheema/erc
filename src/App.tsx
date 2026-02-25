@@ -14,6 +14,13 @@ import AppLayout from "./components/layout/AppLayout";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
 import StravaCallback from "./pages/StravaCallback";
+import { api } from "@/integrations/supabase/client";
+
+// Smart root redirect — skip onboarding if already logged in
+const RootRedirect = () => {
+  const isAuthenticated = !!api.getUser();
+  return <Navigate to={isAuthenticated ? "/home" : "/onboarding"} replace />;
+};
 
 // Lazy loaded — only fetched when user navigates to these routes
 const Home = lazy(() => import("./pages/Home"));
@@ -46,7 +53,7 @@ const AppContent = () => {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public routes — no auth required */}
-        <Route path="/" element={<Navigate to="/onboarding" replace />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<StravaCallback />} />

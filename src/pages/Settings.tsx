@@ -1,19 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Unlink, Medal, BookOpen, Shield } from "lucide-react";
+import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -49,7 +39,7 @@ const Settings = () => {
   const [monthlyGoal, setMonthlyGoal] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
 
   // Fetch notification preferences
   const { data: notifications, isLoading: notificationsLoading } = useQuery({
@@ -439,40 +429,7 @@ const Settings = () => {
                   Re-import all activities with detailed metrics
                 </p>
 
-                {/* Disconnect Strava */}
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      disabled={isDisconnecting || isSyncing}
-                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive"
-                    >
-                      {isDisconnecting ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <Unlink className="w-4 h-4 mr-2" />
-                      )}
-                      {isDisconnecting ? "Disconnecting..." : "Disconnect Strava"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Disconnect Strava?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete all your activity data, leaderboard entries, achievements, and race registrations from this app. Your Strava account itself will not be affected. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDisconnectStrava}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Yes, disconnect and delete data
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+
               </CardContent>
             </Card>
           </motion.div>
