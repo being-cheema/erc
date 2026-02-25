@@ -8,30 +8,15 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     try {
         const userId = req.user!.user_id;
 
-        // Delete activities
+        // Delete everything — full account nuke
         await pool.query('DELETE FROM activities WHERE user_id = $1', [userId]);
-
-        // Delete monthly_leaderboard entries
         await pool.query('DELETE FROM monthly_leaderboard WHERE user_id = $1', [userId]);
-
-        // Delete user_achievements
         await pool.query('DELETE FROM user_achievements WHERE user_id = $1', [userId]);
-
-        // Clear Strava tokens from profile but keep the profile
-        await pool.query(
-            `UPDATE profiles SET
-        strava_id = NULL,
-        strava_access_token = NULL,
-        strava_refresh_token = NULL,
-        strava_token_expires_at = NULL,
-        total_distance = 0,
-        total_runs = 0,
-        current_streak = 0,
-        longest_streak = 0,
-        last_synced_at = NULL
-      WHERE user_id = $1`,
-            [userId]
-        );
+        await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM notification_preferences WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM profiles WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM user_roles WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
         return res.json({ success: true });
     } catch (error: any) {
