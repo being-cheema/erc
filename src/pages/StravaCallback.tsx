@@ -30,10 +30,84 @@ const StravaCallback = () => {
   const handleCallback = useCallback(async () => {
     const code = searchParams.get("code");
     const error = searchParams.get("error");
+    const isNative = searchParams.get("native") === "1";
 
     if (isProcessing.current) return;
-    if (processedCode.current === code) return;
+    if (!isNative && processedCode.current === code) return;
 
+    // ─── NATIVE FLOW: token already in localStorage, skip code exchange ───
+    if (isNative) {
+      isProcessing.current = true;
+      const athleteName = searchParams.get("athlete_name") || "Runner";
+      const userId = searchParams.get("user_id") || "";
+      const isNewUser = searchParams.get("is_new_user") === "1";
+      const token = searchParams.get("token") || api.getToken() || "";
+
+      setSyncState({
+        step: "syncing",
+        message: isNewUser
+          ? `Welcome, ${athleteName}! Pulling your activities from Strava...`
+          : `Welcome back, ${athleteName}! Refreshing your data...`,
+        progress: 25,
+      });
+
+      // Fire sync request (fire-and-forget — server also triggers sync during auth)
+      const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
+      fetch(syncUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId, force_full_sync: true }),
+      }).catch(() => { });
+
+      // Poll for data until activities appear
+      const maxWaitMs = 90_000;
+      const pollIntervalMs = 3_000;
+      const startTime = Date.now();
+      let activitiesFound = 0;
+
+      while (Date.now() - startTime < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(25 + (elapsed / maxWaitMs) * 65, 85);
+        setSyncState(prev => ({
+          ...prev,
+          progress,
+          message: elapsed > 15_000
+            ? `Still syncing... this can take a minute for lots of activities`
+            : prev.message,
+        }));
+        try {
+          const profileRes = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/api/profile`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            if (profile.total_runs && profile.total_runs > 0) {
+              activitiesFound = profile.total_runs;
+              break;
+            }
+          }
+        } catch { /* keep polling */ }
+      }
+
+      if (activitiesFound > 0) {
+        setSyncState({ step: "calculating", message: `Found ${activitiesFound} runs! Calculating your stats...`, activitiesFound, progress: 90 });
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setSyncState({ step: "complete", message: `You're all set, ${athleteName}!`, activitiesFound, progress: 100 });
+      } else {
+        setSyncState({ step: "complete", message: `Welcome, ${athleteName}! Your data is still syncing — it'll appear shortly.`, progress: 100 });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      navigate("/home");
+      return;
+    }
+
+    // ─── BROWSER FLOW: exchange code for token, then sync ───
     if (error) {
       setSyncState({ step: "error", message: "Authorization was denied", errorDetails: "Please try logging in again." });
       setCanRetry(true);

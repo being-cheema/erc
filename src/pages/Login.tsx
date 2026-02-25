@@ -91,7 +91,9 @@ const Login = () => {
                 api.setToken(pollData.token);
                 if (pollData.refresh_token) api.setRefreshToken(pollData.refresh_token);
                 try { await Browser.close(); } catch { /* may already be closed */ }
-                window.location.href = "/home";
+                // Navigate to sync screen (same page as browser flow) with native flag
+                // StravaCallback will skip code exchange and just do the sync + polling
+                window.location.href = `/auth/callback?native=1&user_id=${pollData.user_id || ''}&athlete_name=${encodeURIComponent(pollData.athlete_name || 'Runner')}&is_new_user=${pollData.is_new_user ? '1' : '0'}&token=${encodeURIComponent(pollData.token)}`;
               }
             } catch {
               // Network error, keep polling
