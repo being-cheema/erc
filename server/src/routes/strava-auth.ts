@@ -249,8 +249,13 @@ router.get('/', async (req: Request, res: Response) => {
                 [userId, refreshToken, refreshExpiresAt.toISOString()]
             );
 
-            // Note: sync is handled by the frontend (StravaCallback.tsx) which shows
-            // a progress screen. Don't trigger it here to avoid double-sync.
+            // Start sync immediately in the background — the frontend will poll for completion
+            const syncUrl = `http://localhost:${process.env.PORT || 3001}/functions/v1/sync-strava`;
+            fetch(syncUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ force_full_sync: true }),
+            }).catch(err => console.error('[auth] Background sync failed:', err));
 
             return res.json({
                 success: true,

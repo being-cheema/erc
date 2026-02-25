@@ -77,70 +77,84 @@ const StravaCallback = () => {
       const userId = data.user_id;
       const isNewUser = data.is_new_user;
 
-      // Always sync — ensures data is fresh whether new user, reconnect, or returning user
+      // Show sync screen immediately
       setSyncState({
         step: "syncing",
         message: isNewUser
-          ? `Welcome, ${athleteName}! Syncing your activities...`
+          ? `Welcome, ${athleteName}! Pulling your activities from Strava...`
           : `Welcome back, ${athleteName}! Refreshing your data...`,
-        progress: 30,
+        progress: 25,
       });
 
-      try {
-        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
-        const syncResponse = await fetch(syncUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
-          },
-          body: JSON.stringify({ user_id: userId, force_full_sync: true }),
-        });
+      // Fire sync request (fire-and-forget — server also triggers sync during auth)
+      const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`;
+      fetch(syncUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
+        },
+        body: JSON.stringify({ user_id: userId, force_full_sync: true }),
+      }).catch(() => { }); // fire-and-forget
 
-        const syncData = await syncResponse.json();
+      // Poll for data — wait until activities appear in the DB
+      const maxWaitMs = 90_000; // 90 seconds max
+      const pollIntervalMs = 3_000;
+      const startTime = Date.now();
+      let activitiesFound = 0;
 
-        if (syncData.success && syncData.results?.[0]) {
-          const result = syncData.results[0];
+      while (Date.now() - startTime < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
 
-          if (result.success) {
-            setSyncState({
-              step: "calculating",
-              message: `Found ${result.activities || 0} runs! Calculating your stats...`,
-              activitiesFound: result.activities,
-              progress: 70,
-            });
+        // Update progress animation
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(25 + (elapsed / maxWaitMs) * 65, 85);
+        setSyncState(prev => ({
+          ...prev,
+          progress,
+          message: elapsed > 15_000
+            ? `Still syncing... this can take a minute for lots of activities`
+            : prev.message,
+        }));
 
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            if (result.newAchievements && result.newAchievements.length > 0) {
-              setSyncState({
-                step: "achievements",
-                message: `🏆 Unlocked ${result.newAchievements.length} achievement${result.newAchievements.length > 1 ? 's' : ''}!`,
-                activitiesFound: result.activities,
-                progress: 90,
-              });
-              await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+          const profileRes = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/api/profile`,
+            { headers: { Authorization: `Bearer ${data.token}` } }
+          );
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            if (profile.total_runs && profile.total_runs > 0) {
+              activitiesFound = profile.total_runs;
+              break;
             }
-
-            setSyncState({
-              step: "complete",
-              message: `You're all set, ${athleteName}!`,
-              activitiesFound: result.activities,
-              progress: 100,
-            });
-          } else {
-            console.warn("Sync warning:", result.error);
-            setSyncState({ step: "complete", message: `Welcome, ${athleteName}!`, progress: 100 });
           }
-        } else {
-          setSyncState({ step: "complete", message: `Welcome, ${athleteName}!`, progress: 100 });
-        }
-      } catch (syncError) {
-        console.error("Sync error:", syncError);
-        setSyncState({ step: "complete", message: `Welcome, ${athleteName}!`, progress: 100 });
+        } catch { /* keep polling */ }
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      if (activitiesFound > 0) {
+        setSyncState({
+          step: "calculating",
+          message: `Found ${activitiesFound} runs! Calculating your stats...`,
+          activitiesFound,
+          progress: 90,
+        });
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setSyncState({
+          step: "complete",
+          message: `You're all set, ${athleteName}!`,
+          activitiesFound,
+          progress: 100,
+        });
+      } else {
+        setSyncState({
+          step: "complete",
+          message: `Welcome, ${athleteName}! Your data is still syncing — it'll appear shortly.`,
+          progress: 100,
+        });
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/home");
     } catch (err) {
       console.error("Callback error:", err);
