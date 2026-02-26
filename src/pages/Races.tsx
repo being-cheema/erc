@@ -43,8 +43,18 @@ const Races = () => {
     }
   };
 
+  // Safely parse a date string that may be "YYYY-MM-DD" or a full ISO timestamp
+  const parseRaceDate = (dateStr: string) => {
+    // If it's a plain date (YYYY-MM-DD), append time to parse in local timezone
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return new Date(dateStr + "T00:00:00");
+    }
+    // Otherwise it's already an ISO timestamp or similar — parse directly
+    return new Date(dateStr);
+  };
+
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr + "T00:00:00"); // local timezone
+    const date = parseRaceDate(dateStr);
     return {
       month: format(date, "MMM").toUpperCase(),
       day: format(date, "d"),
@@ -53,7 +63,7 @@ const Races = () => {
   };
 
   const getCountdown = (dateStr: string) => {
-    const raceDate = new Date(dateStr + "T00:00:00"); // local timezone
+    const raceDate = parseRaceDate(dateStr);
     if (isPast(raceDate)) return null;
     const days = differenceInDays(raceDate, new Date());
     if (days === 0) return "Today!";
@@ -237,15 +247,15 @@ const Races = () => {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-primary flex flex-col items-center justify-center">
                     <span className="text-xs text-primary-foreground/90 font-bold">
-                      {format(new Date(selectedRace.race_date), "MMM").toUpperCase()}
+                      {format(parseRaceDate(selectedRace.race_date), "MMM").toUpperCase()}
                     </span>
                     <span className="text-2xl font-black text-primary-foreground">
-                      {format(new Date(selectedRace.race_date), "d")}
+                      {format(parseRaceDate(selectedRace.race_date), "d")}
                     </span>
                   </div>
                   <div>
                     <p className="text-lg font-bold text-foreground">
-                      {format(new Date(selectedRace.race_date), "EEEE, MMMM d, yyyy")}
+                      {format(parseRaceDate(selectedRace.race_date), "EEEE, MMMM d, yyyy")}
                     </p>
                     {selectedRace.location && (
                       <div className="flex items-center gap-2 mt-1">
