@@ -7,6 +7,9 @@ RUN npm install
 
 COPY . .
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
 EXPOSE 3001
 
 CMD ["npx", "tsx", "watch", "src/index.ts"]

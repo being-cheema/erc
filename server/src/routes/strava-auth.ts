@@ -41,7 +41,7 @@ router.get('/', async (req: Request, res: Response) => {
             }
 
             if (!ALLOWED_REDIRECT_URIS.includes(redirectUri)) {
-                console.error('Invalid redirect_uri attempted:', redirectUri);
+                console.error('Invalid redirect_uri attempted:', String(redirectUri).replace(/[\n\r\t]/g, ''));
                 return res.status(400).json({ error: 'Invalid redirect_uri' });
             }
 

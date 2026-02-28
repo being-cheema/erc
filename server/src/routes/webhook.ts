@@ -48,7 +48,7 @@ router.post('/', (req: Request, res: Response) => {
     const dedupeKey = `${event.object_type}:${event.object_id}:${event.aspect_type}`;
     const lastSeen = recentEvents.get(dedupeKey);
     if (lastSeen && Date.now() - lastSeen < DEDUP_WINDOW_MS) {
-        console.log(`[webhook] Dedup: skipping duplicate ${dedupeKey}`);
+        console.log(`[webhook] Dedup: skipping duplicate ${String(dedupeKey).replace(/[\n\r\t]/g, '')}`);
         return;
     }
     recentEvents.set(dedupeKey, Date.now());
@@ -70,7 +70,7 @@ async function processWebhookEvent(event: {
 }) {
     const { object_type, aspect_type, object_id, owner_id } = event;
 
-    console.log(`[webhook] Event: ${object_type}.${aspect_type} id=${object_id} owner=${owner_id}`);
+    console.log(`[webhook] Event: ${String(object_type).replace(/[\n\r\t]/g, '')}.${String(aspect_type).replace(/[\n\r\t]/g, '')} id=${Number(object_id)} owner=${Number(owner_id)}`);
 
     // Look up user by Strava athlete ID (owner_id)
     const { rows: profiles } = await pool.query(

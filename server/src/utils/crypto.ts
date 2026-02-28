@@ -47,7 +47,8 @@ export function decryptToken(encrypted: string): string {
         const iv = Buffer.from(ivHex, 'hex');
         const authTag = Buffer.from(authTagHex, 'hex');
 
-        const decipher = crypto.createDecipheriv(ALGORITHM, KEY, iv);
+        const decipher = crypto.createDecipheriv(ALGORITHM, KEY, iv, { authTagLength: AUTH_TAG_LENGTH });
+        if (authTag.length !== AUTH_TAG_LENGTH) throw new Error('Invalid auth tag length');
         decipher.setAuthTag(authTag);
 
         let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
