@@ -271,7 +271,224 @@ async function checkAndUnlockAchievements(userId: string, stats: { totalDistance
     }
 }
 
-// ── Main sync handler ──
+// ── In-memory sync status tracker ──
+interface SyncStatus {
+    status: 'running' | 'done' | 'error';
+    startedAt: number;
+    activities?: number;
+    error?: string;
+}
+const syncStatusMap = new Map<string, SyncStatus>();
+
+// Auto-clean entries older than 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of syncStatusMap) {
+        if (now - val.startedAt > 5 * 60 * 1000) syncStatusMap.delete(key);
+    }
+}, 60_000);
+
+// ── Sync status endpoint ──
+router.get('/status/:userId', (req: Request, res: Response) => {
+    const status = syncStatusMap.get(req.params.userId);
+    if (!status) return res.json({ status: 'idle' });
+    return res.json(status);
+});
+
+// ── Background sync worker ──
+async function doSyncWork(profiles: any[], forceFullSync: boolean) {
+    for (const profile of profiles) {
+        syncStatusMap.set(profile.user_id, { status: 'running', startedAt: Date.now() });
+        try {
+            let accessToken = decryptToken(profile.strava_access_token);
+            if (!accessToken) {
+                syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: 'No access token' });
+                continue;
+            }
+
+            // Check if token is expired
+            const expiresAt = new Date(profile.strava_token_expires_at || 0);
+            if (expiresAt < new Date()) {
+                if (!profile.strava_refresh_token) {
+                    syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: 'No refresh token' });
+                    continue;
+                }
+                accessToken = await refreshToken(profile.user_id, decryptToken(profile.strava_refresh_token));
+                if (!accessToken) {
+                    syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: 'Token refresh failed' });
+                    continue;
+                }
+            }
+
+            // Determine sync mode
+            const needsFullSync = forceFullSync || !profile.total_runs || !profile.total_distance;
+
+            let allRuns: StravaActivity[];
+            let monthlyRuns: StravaActivity[];
+            let newActivitiesToStore: StravaActivity[] = [];
+
+            if (needsFullSync) {
+                const allActivities = await fetchAllStravaActivities(accessToken);
+                allRuns = allActivities.filter(a => a.type === 'Run');
+                newActivitiesToStore = allRuns;
+
+                const startOfMonth = new Date();
+                startOfMonth.setDate(1);
+                startOfMonth.setHours(0, 0, 0, 0);
+                monthlyRuns = allRuns.filter(a => new Date(a.start_date) >= startOfMonth);
+            } else {
+                // Incremental sync
+                const lastActivityResult = await pool.query(
+                    `SELECT start_date FROM activities WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1`,
+                    [profile.user_id]
+                );
+
+                const startOfMonth = new Date();
+                startOfMonth.setDate(1);
+                startOfMonth.setHours(0, 0, 0, 0);
+
+                let afterTimestamp: number;
+                if (lastActivityResult.rows[0]?.start_date) {
+                    const lastDate = new Date(lastActivityResult.rows[0].start_date);
+                    lastDate.setDate(lastDate.getDate() - 1);
+                    afterTimestamp = Math.floor(lastDate.getTime() / 1000);
+                } else {
+                    afterTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+                }
+
+                let newActivities: StravaActivity[] = [];
+                let page = 1;
+                let hasMore = true;
+                while (hasMore) {
+                    const activities = await fetchStravaActivitiesPage(accessToken, page, afterTimestamp);
+                    if (activities.length === 0) { hasMore = false; }
+                    else { newActivities = [...newActivities, ...activities]; page++; if (page > 5) break; }
+                }
+
+                const newRuns = newActivities.filter(a => a.type === 'Run');
+                newActivitiesToStore = newRuns;
+                monthlyRuns = newRuns.filter(a => new Date(a.start_date) >= startOfMonth);
+
+                const { rows: storedActivities } = await pool.query(
+                    `SELECT distance, start_date, strava_id FROM activities WHERE user_id = $1`,
+                    [profile.user_id]
+                );
+
+                const storedStravaIds = new Set(storedActivities.map(a => a.strava_id));
+                const uniqueNewRuns = newRuns.filter(r => !storedStravaIds.has(r.id));
+
+                allRuns = [
+                    ...uniqueNewRuns,
+                    ...storedActivities.map(a => ({
+                        id: a.strava_id || 0, name: '', distance: Number(a.distance) || 0,
+                        moving_time: 0, elapsed_time: 0, type: 'Run', start_date: a.start_date || '',
+                    })),
+                ];
+            }
+
+            // Fetch athlete profile
+            const athlete = await fetchStravaAthlete(accessToken);
+
+            // Fetch detailed data for only 5 most recent activities (saves API budget)
+            const activityDetails = await fetchRecentActivityDetails(accessToken, newActivitiesToStore, 5);
+
+            // Calculate totals
+            const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
+            const totalRunsCount = allRuns.length;
+
+            // Store activities in batches
+            try {
+                const weight = athlete?.weight || 70;
+                const toInt = (val: number | undefined | null): number | null => {
+                    if (val === undefined || val === null) return null;
+                    return Math.round(val);
+                };
+
+                const batchSize = 100;
+                for (let i = 0; i < newActivitiesToStore.length; i += batchSize) {
+                    const batch = newActivitiesToStore.slice(i, i + batchSize);
+
+                    for (const run of batch) {
+                        const detail = activityDetails.get(run.id);
+                        const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
+                        const estimatedCalories = detail?.calories || Math.round((run.distance / 1000) * weight * 0.9);
+
+                        await pool.query(
+                            `INSERT INTO activities (user_id, strava_id, name, distance, moving_time, elapsed_time, start_date, average_pace, average_speed, max_speed, activity_type, calories, elevation_gain, average_heartrate, max_heartrate, suffer_score, kudos_count, achievement_count, description, workout_type, gear_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+                ON CONFLICT (strava_id) DO UPDATE SET
+                  name=$3, distance=$4, moving_time=$5, elapsed_time=$6, start_date=$7, average_pace=$8, average_speed=$9, max_speed=$10, calories=$12, elevation_gain=$13, average_heartrate=$14, max_heartrate=$15, suffer_score=$16, kudos_count=$17, achievement_count=$18, description=$19, workout_type=$20, gear_id=$21`,
+                            [
+                                profile.user_id, run.id, run.name, run.distance, toInt(run.moving_time),
+                                toInt(run.elapsed_time || detail?.elapsed_time), run.start_date, avgPace,
+                                detail?.average_speed || run.average_speed, detail?.max_speed || run.max_speed,
+                                run.type, toInt(estimatedCalories), detail?.total_elevation_gain || run.total_elevation_gain || 0,
+                                toInt(detail?.average_heartrate || run.average_heartrate),
+                                toInt(detail?.max_heartrate || run.max_heartrate),
+                                toInt(detail?.suffer_score || run.suffer_score),
+                                toInt(detail?.kudos_count || run.kudos_count || 0),
+                                toInt(detail?.achievement_count || run.achievement_count || 0),
+                                detail?.description, toInt(detail?.workout_type), detail?.gear_id,
+                            ]
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error('Error storing activities:', err);
+            }
+
+            // Calculate streaks
+            const runDates = allRuns.map(r => new Date(r.start_date));
+            const { currentStreak, longestStreak } = calculateStreaks(runDates);
+
+            // Recalculate monthly leaderboard
+            await pool.query('SELECT recalculate_monthly_leaderboard($1)', [profile.user_id]);
+
+            // Update profile
+            const currentProfile = await pool.query(
+                'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1', [profile.user_id]
+            );
+
+            let updateQuery = `UPDATE profiles SET total_distance=$1, total_runs=$2, current_streak=$3, longest_streak=$4, last_synced_at=$5`;
+            let updateParams: any[] = [totalDistance, totalRunsCount, currentStreak, longestStreak, new Date().toISOString()];
+            let paramIdx = 6;
+
+            if (athlete) {
+                updateQuery += `, display_name=$${paramIdx}, avatar_url=$${paramIdx + 1}, city=$${paramIdx + 2}, country=$${paramIdx + 3}, weight=$${paramIdx + 4}, sex=$${paramIdx + 5}, measurement_preference=$${paramIdx + 6}, follower_count=$${paramIdx + 7}, friend_count=$${paramIdx + 8}, premium=$${paramIdx + 9}`;
+                updateParams.push(
+                    currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`.trim(),
+                    currentProfile.rows[0]?.avatar_url || athlete.profile || athlete.profile_medium,
+                    athlete.city, athlete.country, athlete.weight, athlete.sex,
+                    athlete.measurement_preference, athlete.follower_count, athlete.friend_count, athlete.premium,
+                );
+                paramIdx += 10;
+            }
+
+            updateQuery += ` WHERE user_id=$${paramIdx}`;
+            updateParams.push(profile.user_id);
+
+            await pool.query(updateQuery, updateParams);
+
+            // Check achievements
+            const newAchievements = await checkAndUnlockAchievements(profile.user_id, {
+                totalDistance, totalRuns: totalRunsCount, currentStreak, longestStreak,
+            });
+
+            syncStatusMap.set(profile.user_id, {
+                status: 'done',
+                startedAt: Date.now(),
+                activities: totalRunsCount,
+            });
+
+            console.log(`[sync] ✅ ${profile.user_id.slice(0, 8)}... done — ${totalRunsCount} runs, ${newAchievements.length} new achievements`);
+        } catch (error: any) {
+            console.error(`Sync error for user ${profile.user_id}:`, error);
+            syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: error.message });
+        }
+    }
+}
+
+// ── Main sync handler — responds immediately, syncs in background ──
 router.all('/', async (req: Request, res: Response) => {
     try {
         // Check rate limit budget first
@@ -327,206 +544,23 @@ router.all('/', async (req: Request, res: Response) => {
             return res.json({ success: true, message: 'No profiles to sync', results: [] });
         }
 
-        const results: any[] = [];
-
-        for (const profile of profiles) {
-            try {
-                let accessToken = decryptToken(profile.strava_access_token);
-                if (!accessToken) {
-                    results.push({ userId: profile.user_id, success: false, error: 'No access token' });
-                    continue;
-                }
-
-                // Check if token is expired
-                const expiresAt = new Date(profile.strava_token_expires_at || 0);
-                if (expiresAt < new Date()) {
-                    if (!profile.strava_refresh_token) {
-                        results.push({ userId: profile.user_id, success: false, error: 'No refresh token' });
-                        continue;
-                    }
-                    accessToken = await refreshToken(profile.user_id, decryptToken(profile.strava_refresh_token));
-                    if (!accessToken) {
-                        results.push({ userId: profile.user_id, success: false, error: 'Token refresh failed' });
-                        continue;
-                    }
-                }
-
-                // Determine sync mode
-                const needsFullSync = forceFullSync || !profile.total_runs || !profile.total_distance;
-
-                let allRuns: StravaActivity[];
-                let monthlyRuns: StravaActivity[];
-                let newActivitiesToStore: StravaActivity[] = [];
-
-                if (needsFullSync) {
-                    const allActivities = await fetchAllStravaActivities(accessToken);
-                    allRuns = allActivities.filter(a => a.type === 'Run');
-                    newActivitiesToStore = allRuns;
-
-                    const startOfMonth = new Date();
-                    startOfMonth.setDate(1);
-                    startOfMonth.setHours(0, 0, 0, 0);
-                    monthlyRuns = allRuns.filter(a => new Date(a.start_date) >= startOfMonth);
-                } else {
-                    // Incremental sync
-                    const lastActivityResult = await pool.query(
-                        `SELECT start_date FROM activities WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1`,
-                        [profile.user_id]
-                    );
-
-                    const startOfMonth = new Date();
-                    startOfMonth.setDate(1);
-                    startOfMonth.setHours(0, 0, 0, 0);
-
-                    let afterTimestamp: number;
-                    if (lastActivityResult.rows[0]?.start_date) {
-                        const lastDate = new Date(lastActivityResult.rows[0].start_date);
-                        lastDate.setDate(lastDate.getDate() - 1);
-                        afterTimestamp = Math.floor(lastDate.getTime() / 1000);
-                    } else {
-                        afterTimestamp = Math.floor(startOfMonth.getTime() / 1000);
-                    }
-
-                    let newActivities: StravaActivity[] = [];
-                    let page = 1;
-                    let hasMore = true;
-                    while (hasMore) {
-                        const activities = await fetchStravaActivitiesPage(accessToken, page, afterTimestamp);
-                        if (activities.length === 0) { hasMore = false; }
-                        else { newActivities = [...newActivities, ...activities]; page++; if (page > 5) break; }
-                    }
-
-                    const newRuns = newActivities.filter(a => a.type === 'Run');
-                    newActivitiesToStore = newRuns;
-                    monthlyRuns = newRuns.filter(a => new Date(a.start_date) >= startOfMonth);
-
-                    const { rows: storedActivities } = await pool.query(
-                        `SELECT distance, start_date, strava_id FROM activities WHERE user_id = $1`,
-                        [profile.user_id]
-                    );
-
-                    const storedStravaIds = new Set(storedActivities.map(a => a.strava_id));
-                    const uniqueNewRuns = newRuns.filter(r => !storedStravaIds.has(r.id));
-
-                    allRuns = [
-                        ...uniqueNewRuns,
-                        ...storedActivities.map(a => ({
-                            id: a.strava_id || 0, name: '', distance: Number(a.distance) || 0,
-                            moving_time: 0, elapsed_time: 0, type: 'Run', start_date: a.start_date || '',
-                        })),
-                    ];
-                }
-
-                // Fetch athlete profile
-                const athlete = await fetchStravaAthlete(accessToken);
-
-                // Fetch detailed data for only 5 most recent activities (saves API budget)
-                const activityDetails = await fetchRecentActivityDetails(accessToken, newActivitiesToStore, 5);
-
-                // Calculate totals
-                const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
-                const totalRunsCount = allRuns.length;
-
-                // Store activities in batches
-                try {
-                    const weight = athlete?.weight || 70;
-                    const toInt = (val: number | undefined | null): number | null => {
-                        if (val === undefined || val === null) return null;
-                        return Math.round(val);
-                    };
-
-                    const batchSize = 100;
-                    for (let i = 0; i < newActivitiesToStore.length; i += batchSize) {
-                        const batch = newActivitiesToStore.slice(i, i + batchSize);
-
-                        for (const run of batch) {
-                            const detail = activityDetails.get(run.id);
-                            const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
-                            const estimatedCalories = detail?.calories || Math.round((run.distance / 1000) * weight * 0.9);
-
-                            await pool.query(
-                                `INSERT INTO activities (user_id, strava_id, name, distance, moving_time, elapsed_time, start_date, average_pace, average_speed, max_speed, activity_type, calories, elevation_gain, average_heartrate, max_heartrate, suffer_score, kudos_count, achievement_count, description, workout_type, gear_id)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
-                ON CONFLICT (strava_id) DO UPDATE SET
-                  name=$3, distance=$4, moving_time=$5, elapsed_time=$6, start_date=$7, average_pace=$8, average_speed=$9, max_speed=$10, calories=$12, elevation_gain=$13, average_heartrate=$14, max_heartrate=$15, suffer_score=$16, kudos_count=$17, achievement_count=$18, description=$19, workout_type=$20, gear_id=$21`,
-                                [
-                                    profile.user_id, run.id, run.name, run.distance, toInt(run.moving_time),
-                                    toInt(run.elapsed_time || detail?.elapsed_time), run.start_date, avgPace,
-                                    detail?.average_speed || run.average_speed, detail?.max_speed || run.max_speed,
-                                    run.type, toInt(estimatedCalories), detail?.total_elevation_gain || run.total_elevation_gain || 0,
-                                    toInt(detail?.average_heartrate || run.average_heartrate),
-                                    toInt(detail?.max_heartrate || run.max_heartrate),
-                                    toInt(detail?.suffer_score || run.suffer_score),
-                                    toInt(detail?.kudos_count || run.kudos_count || 0),
-                                    toInt(detail?.achievement_count || run.achievement_count || 0),
-                                    detail?.description, toInt(detail?.workout_type), detail?.gear_id,
-                                ]
-                            );
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error storing activities:', err);
-                }
-
-                // Calculate streaks
-                const runDates = allRuns.map(r => new Date(r.start_date));
-                const { currentStreak, longestStreak } = calculateStreaks(runDates);
-
-                // Recalculate monthly leaderboard
-                await pool.query('SELECT recalculate_monthly_leaderboard($1)', [profile.user_id]);
-
-                // Update profile
-                const currentProfile = await pool.query(
-                    'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1', [profile.user_id]
-                );
-
-                const profileUpdate: any = {
-                    total_distance: totalDistance,
-                    total_runs: totalRunsCount,
-                    current_streak: currentStreak,
-                    longest_streak: longestStreak,
-                    last_synced_at: new Date().toISOString(),
-                };
-
-                let updateQuery = `UPDATE profiles SET total_distance=$1, total_runs=$2, current_streak=$3, longest_streak=$4, last_synced_at=$5`;
-                let updateParams: any[] = [totalDistance, totalRunsCount, currentStreak, longestStreak, new Date().toISOString()];
-                let paramIdx = 6;
-
-                if (athlete) {
-                    updateQuery += `, display_name=$${paramIdx}, avatar_url=$${paramIdx + 1}, city=$${paramIdx + 2}, country=$${paramIdx + 3}, weight=$${paramIdx + 4}, sex=$${paramIdx + 5}, measurement_preference=$${paramIdx + 6}, follower_count=$${paramIdx + 7}, friend_count=$${paramIdx + 8}, premium=$${paramIdx + 9}`;
-                    updateParams.push(
-                        currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`.trim(),
-                        currentProfile.rows[0]?.avatar_url || athlete.profile || athlete.profile_medium,
-                        athlete.city, athlete.country, athlete.weight, athlete.sex,
-                        athlete.measurement_preference, athlete.follower_count, athlete.friend_count, athlete.premium,
-                    );
-                    paramIdx += 10;
-                }
-
-                updateQuery += ` WHERE user_id=$${paramIdx}`;
-                updateParams.push(profile.user_id);
-
-                await pool.query(updateQuery, updateParams);
-
-                // Check achievements
-                const newAchievements = await checkAndUnlockAchievements(profile.user_id, {
-                    totalDistance, totalRuns: totalRunsCount, currentStreak, longestStreak,
-                });
-
-                results.push({
-                    userId: profile.user_id,
-                    success: true,
-                    activities: totalRunsCount,
-                    needsFullSync,
-                    newAchievements: newAchievements.length > 0 ? newAchievements : undefined,
-                });
-            } catch (error: any) {
-                console.error(`Sync error for user ${profile.user_id}:`, error);
-                results.push({ userId: profile.user_id, success: false, error: error.message });
-            }
+        // Mark all users as syncing
+        for (const p of profiles) {
+            syncStatusMap.set(p.user_id, { status: 'running', startedAt: Date.now() });
         }
 
-        return res.json({ success: true, results });
+        // Respond immediately — sync runs in background
+        res.status(202).json({
+            success: true,
+            status: 'started',
+            message: `Syncing ${profiles.length} user(s) in the background`,
+            users: profiles.map(p => p.user_id),
+        });
+
+        // Fire and forget — don't await
+        doSyncWork(profiles, forceFullSync).catch(err => {
+            console.error('[sync] Background worker error:', err);
+        });
     } catch (error) {
         console.error('Sync error:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -534,3 +568,4 @@ router.all('/', async (req: Request, res: Response) => {
 });
 
 export default router;
+
