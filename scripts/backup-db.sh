@@ -11,7 +11,7 @@ mkdir -p "$BACKUP_DIR"
 
 FILENAME="erode_runners_$(date +%Y%m%d_%H%M%S).sql.gz"
 
-docker compose -f "$COMPOSE_DIR/docker-compose.yml" exec -T postgres \
+docker compose --env-file "$COMPOSE_DIR/server/.env" -f "$COMPOSE_DIR/docker-compose.yml" exec -T postgres \
   pg_dump -U erode_runner erode_runners | gzip > "$BACKUP_DIR/$FILENAME"
 
 # Delete backups older than $KEEP_DAYS days
