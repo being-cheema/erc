@@ -74,8 +74,9 @@ const StravaCallback = () => {
       setSyncState({ step: "auth", message: "Exchanging tokens...", progress: 10 });
 
       // Call our self-hosted API (same paths as Supabase edge functions)
+      const state = searchParams.get("state") || "";
       const callbackResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=callback&code=${code}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=callback&code=${code}&state=${encodeURIComponent(state)}`,
         { method: "GET", headers: { "Content-Type": "application/json" } }
       );
 
