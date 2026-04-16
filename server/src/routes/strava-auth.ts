@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { signToken, generateRefreshToken } from '../utils/jwt.js';
+import { signToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import crypto from 'crypto';
 
@@ -45,6 +45,20 @@ router.get('/', async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'Invalid redirect_uri' });
             }
 
+            // Require authenticated user — Strava connect is post-login only
+            const authHeader = req.headers.authorization;
+            let authenticatedUserId: string | null = null;
+            if (authHeader?.startsWith('Bearer ')) {
+                try {
+                    const payload = verifyToken(authHeader.replace('Bearer ', ''));
+                    authenticatedUserId = payload.user_id;
+                } catch { /* invalid token */ }
+            }
+
+            if (!authenticatedUserId) {
+                return res.status(401).json({ error: 'Authentication required. Please log in first.' });
+            }
+
             const stravaAuthUrl = new URL('https://www.strava.com/oauth/authorize');
             stravaAuthUrl.searchParams.set('client_id', STRAVA_CLIENT_ID);
             stravaAuthUrl.searchParams.set('response_type', 'code');
@@ -52,21 +66,40 @@ router.get('/', async (req: Request, res: Response) => {
             stravaAuthUrl.searchParams.set('approval_prompt', 'auto');
             stravaAuthUrl.searchParams.set('scope', 'read,activity:read_all,profile:read_all');
 
-            // Forward state param (used for polling-based native auth)
-            const state = req.query.state as string;
-            if (state) {
-                stravaAuthUrl.searchParams.set('state', state);
-            }
+            // Encode user_id (and optional native poll state) in the state param
+            const nativeState = req.query.state as string;
+            const statePayload = nativeState
+                ? `${authenticatedUserId}:${nativeState}`
+                : authenticatedUserId;
+            stravaAuthUrl.searchParams.set('state', statePayload);
 
             return res.json({ url: stravaAuthUrl.toString() });
         }
 
-        // ─── CALLBACK: Exchange code for tokens, create/find user ───
+        // ─── CALLBACK: Exchange code for tokens, LINK to existing user ───
         if (action === 'callback') {
             const code = req.query.code as string;
+            const stateParam = req.query.state as string;
+
             if (!code) {
                 return res.status(400).json({ error: 'code is required' });
             }
+
+            // Extract user_id from state (format: "userId" or "userId:nativeState")
+            if (!stateParam) {
+                return res.status(400).json({ error: 'Invalid state — no user context. Please log in and try again.' });
+            }
+
+            const stateParts = stateParam.split(':');
+            const userId = stateParts[0];
+            const nativeState = stateParts.length > 1 ? stateParts.slice(1).join(':') : null;
+
+            // Verify user exists
+            const userCheck = await pool.query('SELECT id, email FROM users WHERE id = $1', [userId]);
+            if (!userCheck.rows.length) {
+                return res.status(400).json({ error: 'User not found. Please log in again.' });
+            }
+            const userEmail = userCheck.rows[0].email;
 
             // Exchange code for tokens with Strava
             const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
@@ -80,7 +113,6 @@ router.get('/', async (req: Request, res: Response) => {
                 }),
             });
 
-
             if (!tokenResponse.ok) {
                 const errorText = await tokenResponse.text();
                 console.error('[strava-auth] Token exchange FAILED:', errorText);
@@ -90,142 +122,55 @@ router.get('/', async (req: Request, res: Response) => {
             const tokenData = await tokenResponse.json();
             const { access_token, refresh_token, expires_at, athlete } = tokenData;
 
-            // Check if user exists with this Strava ID
-            const existingProfile = await pool.query(
-                'SELECT user_id FROM profiles WHERE strava_id = $1',
-                [athlete.id.toString()]
+            // Check if this Strava account is already linked to ANOTHER user
+            const existingLink = await pool.query(
+                'SELECT user_id FROM profiles WHERE strava_id = $1 AND user_id != $2',
+                [athlete.id.toString(), userId]
+            );
+            if (existingLink.rows.length > 0) {
+                return res.status(409).json({ error: 'This Strava account is already linked to another user.' });
+            }
+
+            // Link Strava to the existing user's profile (upsert)
+            const currentProfile = await pool.query(
+                'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1',
+                [userId]
             );
 
-            let userId: string;
-            let isNewUser = false;
+            await pool.query(
+                `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    strava_id = $2,
+                    strava_access_token = $3,
+                    strava_refresh_token = $4,
+                    strava_token_expires_at = $5,
+                    display_name = COALESCE(NULLIF(profiles.display_name, ''), $6),
+                    avatar_url = COALESCE(NULLIF(profiles.avatar_url, ''), $7),
+                    city = $8`,
+                [
+                    userId,
+                    athlete.id.toString(),
+                    encryptToken(access_token),
+                    encryptToken(refresh_token),
+                    new Date(expires_at * 1000).toISOString(),
+                    currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
+                    currentProfile.rows[0]?.avatar_url || athlete.profile,
+                    athlete.city || null,
+                ]
+            );
 
-            if (existingProfile.rows.length > 0) {
-                // Existing user — update tokens, preserve user-set display_name/avatar
-                userId = existingProfile.rows[0].user_id;
+            // Ensure member role and notification prefs exist
+            await pool.query(
+                `INSERT INTO user_roles (user_id, role) VALUES ($1, 'member') ON CONFLICT (user_id, role) DO NOTHING`,
+                [userId]
+            );
+            await pool.query(
+                `INSERT INTO notification_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`,
+                [userId]
+            );
 
-                const currentProfile = await pool.query(
-                    'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1',
-                    [userId]
-                );
-
-                await pool.query(
-                    `UPDATE profiles SET
-            strava_access_token = $1,
-            strava_refresh_token = $2,
-            strava_token_expires_at = $3,
-            display_name = $4,
-            avatar_url = $5,
-            city = $6
-          WHERE user_id = $7`,
-                    [
-                        encryptToken(access_token),
-                        encryptToken(refresh_token),
-                        new Date(expires_at * 1000).toISOString(),
-                        currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
-                        currentProfile.rows[0]?.avatar_url || athlete.profile,
-                        athlete.city || null,
-                        userId,
-                    ]
-                );
-            } else {
-                // New user OR reconnecting user
-                isNewUser = true;
-                const email = `strava_${athlete.id}@eroderunners.local`;
-
-                // Check if auth user exists (reconnect after disconnect)
-                const existingUser = await pool.query(
-                    'SELECT id FROM users WHERE email = $1',
-                    [email]
-                );
-
-                if (existingUser.rows.length > 0) {
-                    // Auth user exists but profile was cleared (reconnect)
-                    userId = existingUser.rows[0].id;
-                    isNewUser = false;
-
-                    await pool.query(
-                        `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (user_id) DO UPDATE SET
-              strava_id = $2,
-              strava_access_token = $3,
-              strava_refresh_token = $4,
-              strava_token_expires_at = $5,
-              display_name = $6,
-              avatar_url = $7,
-              city = $8`,
-                        [
-                            userId,
-                            athlete.id.toString(),
-                            encryptToken(access_token),
-                            encryptToken(refresh_token),
-                            new Date(expires_at * 1000).toISOString(),
-                            `${athlete.firstname} ${athlete.lastname}`,
-                            athlete.profile,
-                            athlete.city || null,
-                        ]
-                    );
-
-                    // Ensure member role exists
-                    await pool.query(
-                        `INSERT INTO user_roles (user_id, role) VALUES ($1, 'member') ON CONFLICT (user_id, role) DO NOTHING`,
-                        [userId]
-                    );
-
-                    // Ensure notification preferences exist
-                    await pool.query(
-                        `INSERT INTO notification_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`,
-                        [userId]
-                    );
-                } else {
-                    // Truly new user — create auth account
-                    const passwordHash = crypto.randomUUID(); // Random, user won't use password login
-
-                    const newUser = await pool.query(
-                        `INSERT INTO users (email, password_hash, user_metadata)
-            VALUES ($1, $2, $3) RETURNING id`,
-                        [
-                            email,
-                            passwordHash,
-                            JSON.stringify({
-                                strava_id: athlete.id,
-                                display_name: `${athlete.firstname} ${athlete.lastname}`,
-                                avatar_url: athlete.profile,
-                            }),
-                        ]
-                    );
-
-                    userId = newUser.rows[0].id;
-
-                    // Create profile
-                    await pool.query(
-                        `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                        [
-                            userId,
-                            athlete.id.toString(),
-                            encryptToken(access_token),
-                            encryptToken(refresh_token),
-                            new Date(expires_at * 1000).toISOString(),
-                            `${athlete.firstname} ${athlete.lastname}`,
-                            athlete.profile,
-                            athlete.city || null,
-                        ]
-                    );
-
-                    // Assign member role
-                    await pool.query(
-                        `INSERT INTO user_roles (user_id, role) VALUES ($1, 'member')`,
-                        [userId]
-                    );
-
-                    // Create default notification preferences
-                    await pool.query(
-                        `INSERT INTO notification_preferences (user_id) VALUES ($1)`,
-                        [userId]
-                    );
-                }
-            }
+            console.log(`[strava-auth] Linked Strava athlete ${athlete.id} to user ${userId}`);
 
             // Get user's role for JWT
             const roleResult = await pool.query(
@@ -234,30 +179,34 @@ router.get('/', async (req: Request, res: Response) => {
             );
             const role = roleResult.rows[0]?.role || 'member';
 
-            // Generate JWT (replaces Supabase magic link)
-            const token = signToken({
-                user_id: userId,
-                email: `strava_${athlete.id}@eroderunners.local`,
-                role,
-            });
+            // Generate fresh JWT with user's real email
+            const token = signToken({ user_id: userId, email: userEmail, role });
 
             // Generate refresh token
             const refreshToken = generateRefreshToken();
-            const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+            const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
             await pool.query(
                 `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
                 [userId, refreshToken, refreshExpiresAt.toISOString()]
             );
 
-            // Auto-sync removed — users can trigger sync manually via Force Sync button
-            // This saves significant API budget at scale
+            // If native poll state, store token for polling
+            if (nativeState) {
+                pendingTokens.set(nativeState, {
+                    token,
+                    refresh_token: refreshToken,
+                    is_new_user: false,
+                    athlete_name: `${athlete.firstname} ${athlete.lastname}`,
+                    created: Date.now(),
+                });
+            }
 
             return res.json({
                 success: true,
                 user_id: userId,
                 token,
                 refresh_token: refreshToken,
-                is_new_user: isNewUser,
+                is_new_user: false,
                 athlete: {
                     id: athlete.id,
                     firstname: athlete.firstname,
