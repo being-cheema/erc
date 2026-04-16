@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, Settings, Dumbbell } from "lucide-react";
+import { ChevronRight, Calendar, Settings, Dumbbell, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
@@ -137,6 +137,30 @@ const Home = () => {
       </motion.div>
 
       <div className="px-5 space-y-3">
+        {/* Empty state when Strava not connected */}
+        {profile && !profile.strava_id && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-6 text-center space-y-4"
+          >
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-strava/10 flex items-center justify-center">
+              <LinkIcon className="w-8 h-8 text-strava" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Connect Strava</h3>
+              <p className="text-sm text-muted-foreground mt-1">Link your Strava account to see your stats, activities, and compete on the leaderboard.</p>
+            </div>
+            <Button
+              onClick={() => navigate("/connect-strava")}
+              className="bg-strava hover:bg-strava-dark text-white gap-2"
+            >
+              <LinkIcon className="w-4 h-4" />
+              Connect Now
+            </Button>
+          </motion.div>
+        )}
+
         {/* Bento Stats - Distance + Calories */}
         <BentoStatsGrid />
 

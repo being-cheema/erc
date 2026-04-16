@@ -7,7 +7,13 @@ const router = Router();
 // GET /api/profiles/me — current user's full profile
 router.get('/me', requireAuth, async (req: Request, res: Response) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [req.user!.user_id]);
+        const { rows } = await pool.query(
+            `SELECT user_id, strava_id, display_name, avatar_url, city,
+                    total_distance, total_runs, current_streak, longest_streak,
+                    monthly_distance_goal, last_synced_at, created_at
+             FROM profiles WHERE user_id = $1`,
+            [req.user!.user_id]
+        );
         if (!rows.length) return res.status(404).json({ error: 'Profile not found' });
         return res.json(rows[0]);
     } catch (err) {

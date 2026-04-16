@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import pool from '../db.js';
 import { signToken, generateRefreshToken } from '../utils/jwt.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 const SALT_ROUNDS = 12;
@@ -92,6 +93,36 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 });
 
+// ─── POST /api/auth/change-password ───
+router.post('/change-password', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const { current_password, new_password } = req.body;
+        if (!current_password || !new_password) {
+            return res.status(400).json({ error: 'Current and new password are required' });
+        }
+        if (new_password.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+
+        const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user!.user_id]);
+        if (!rows.length) return res.status(404).json({ error: 'User not found' });
+
+        // Verify current password (skip if user hasn't set one yet)
+        if (rows[0].password_hash.startsWith('$2')) {
+            const valid = await bcrypt.compare(current_password, rows[0].password_hash);
+            if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user!.user_id]);
+
+        return res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('[auth] Change password error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ─── POST /api/auth/forgot-password ───
 router.post('/forgot-password', async (req: Request, res: Response) => {
     try {
@@ -108,6 +139,19 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
         if (rows.length > 0) {
             const userId = rows[0].id;
+
+            // Per-user rate limit: max 1 reset every 2 minutes
+            const recentToken = await pool.query(
+                'SELECT created_at FROM password_reset_tokens WHERE user_id = $1 AND used = false ORDER BY created_at DESC LIMIT 1',
+                [userId]
+            );
+            if (recentToken.rows.length > 0) {
+                const lastRequested = new Date(recentToken.rows[0].created_at);
+                if (Date.now() - lastRequested.getTime() < 2 * 60 * 1000) {
+                    // Silently succeed — don't reveal rate limit to attacker
+                    return res.json({ success: true, message: 'If an account with that email exists, a reset link has been sent.' });
+                }
+            }
 
             // Invalidate any existing tokens for this user
             await pool.query(

@@ -4,6 +4,28 @@ import { signToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import crypto from 'crypto';
 
+const JWT_SECRET = process.env.JWT_SECRET || '';
+
+// HMAC sign state to prevent tampering
+function signState(userId: string, nativeState?: string): string {
+    const payload = nativeState ? `${userId}:${nativeState}` : userId;
+    const hmac = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex').slice(0, 16);
+    return `${payload}.${hmac}`;
+}
+
+function verifyState(state: string): { userId: string; nativeState: string | null } | null {
+    const dotIdx = state.lastIndexOf('.');
+    if (dotIdx === -1) return null;
+    const payload = state.slice(0, dotIdx);
+    const sig = state.slice(dotIdx + 1);
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex').slice(0, 16);
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    const colonIdx = payload.indexOf(':');
+    return colonIdx === -1
+        ? { userId: payload, nativeState: null }
+        : { userId: payload.slice(0, colonIdx), nativeState: payload.slice(colonIdx + 1) };
+}
+
 const router = Router();
 
 const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID!;
@@ -66,11 +88,9 @@ router.get('/', async (req: Request, res: Response) => {
             stravaAuthUrl.searchParams.set('approval_prompt', 'auto');
             stravaAuthUrl.searchParams.set('scope', 'read,activity:read_all,profile:read_all');
 
-            // Encode user_id (and optional native poll state) in the state param
+            // Encode user_id (and optional native poll state) in the state param with HMAC
             const nativeState = req.query.state as string;
-            const statePayload = nativeState
-                ? `${authenticatedUserId}:${nativeState}`
-                : authenticatedUserId;
+            const statePayload = signState(authenticatedUserId, nativeState || undefined);
             stravaAuthUrl.searchParams.set('state', statePayload);
 
             return res.json({ url: stravaAuthUrl.toString() });
@@ -85,14 +105,17 @@ router.get('/', async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'code is required' });
             }
 
-            // Extract user_id from state (format: "userId" or "userId:nativeState")
+            // Extract and verify user_id from HMAC-signed state
             if (!stateParam) {
                 return res.status(400).json({ error: 'Invalid state — no user context. Please log in and try again.' });
             }
 
-            const stateParts = stateParam.split(':');
-            const userId = stateParts[0];
-            const nativeState = stateParts.length > 1 ? stateParts.slice(1).join(':') : null;
+            const stateResult = verifyState(stateParam);
+            if (!stateResult) {
+                return res.status(400).json({ error: 'Invalid state signature. Please try connecting again.' });
+            }
+
+            const { userId, nativeState } = stateResult;
 
             // Verify user exists
             const userCheck = await pool.query('SELECT id, email FROM users WHERE id = $1', [userId]);

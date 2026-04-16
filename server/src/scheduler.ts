@@ -225,6 +225,24 @@ export function startScheduledSync() {
     // First sync 30 seconds after startup
     setTimeout(() => runScheduledSync(), 30_000);
 
-    // Then every 30 minutes
+    // Then every batch interval
     setInterval(() => runScheduledSync(), BATCH_INTERVAL_MS);
+
+    // Clean up expired tokens every 6 hours
+    const cleanupTokens = async () => {
+        try {
+            const refreshResult = await pool.query('DELETE FROM refresh_tokens WHERE expires_at < NOW()');
+            const resetResult = await pool.query('DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used = true');
+            const totalCleaned = (refreshResult.rowCount || 0) + (resetResult.rowCount || 0);
+            if (totalCleaned > 0) {
+                console.log(`🧹 Cleaned ${totalCleaned} expired tokens`);
+            }
+        } catch (err) {
+            console.error('🧹 Token cleanup error:', err);
+        }
+    };
+
+    // Run cleanup 1 minute after startup, then every 6 hours
+    setTimeout(() => cleanupTokens(), 60_000);
+    setInterval(() => cleanupTokens(), 6 * 60 * 60 * 1000);
 }

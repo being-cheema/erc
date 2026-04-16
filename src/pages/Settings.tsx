@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield, Link as LinkIcon, Unlink, Lock, Mail } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +38,14 @@ const Settings = () => {
   const [monthlyGoal, setMonthlyGoal] = useState(100);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isConnectingStrava, setIsConnectingStrava] = useState(false);
 
 
   // Fetch notification preferences
@@ -168,8 +175,71 @@ const Settings = () => {
 
   const handleSignOut = () => {
     api.clearToken();
-    queryClient.clear(); // Prevent stale queries from firing 401s after re-login
+    queryClient.clear();
     navigate("/login");
+  };
+
+  const handleDisconnectStrava = async () => {
+    setIsDisconnecting(true);
+    mediumImpact();
+    try {
+      await api.post('/functions/v1/disconnect-strava');
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      toast.success("Strava disconnected. All activity data has been removed.");
+      setShowDisconnectConfirm(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to disconnect");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const handleConnectStrava = async () => {
+    setIsConnectingStrava(true);
+    try {
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const token = api.getToken();
+      if (!token) { navigate("/login"); return; }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await response.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      toast.error("Failed to start Strava connection");
+      setIsConnectingStrava(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords don't match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await api.post('/api/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      toast.success("Password changed successfully");
+      setShowChangePassword(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      notificationSuccess();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to change password");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   if (profileLoading) {
@@ -199,7 +269,7 @@ const Settings = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Settings</h1>
-            <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Manage your profile</p>
+            <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">{user?.email}</p>
           </div>
         </div>
       </motion.header>
@@ -364,12 +434,16 @@ const Settings = () => {
         </motion.div>
 
         {/* Strava Connection */}
-        {profile?.strava_id && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" /></svg>
+            Strava
+          </h2>
+          {profile?.strava_id ? (
             <Card className="border-strava/30 bg-strava/5">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-4">
@@ -379,36 +453,112 @@ const Settings = () => {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground font-sans">Strava Connected</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Strava ID: {profile.strava_id}
-                    </p>
+                    <h3 className="font-semibold text-foreground">Connected</h3>
+                    <p className="text-muted-foreground text-sm">Strava ID: {profile.strava_id}</p>
                   </div>
                 </div>
 
-                {/* Force Sync Button */}
-                <Button
-                  onClick={handleForceSync}
-                  disabled={isSyncing}
-                  variant="outline"
-                  className="w-full border-strava/30 hover:bg-strava/10"
-                >
-                  {isSyncing ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  {isSyncing ? "Syncing..." : "Force Full Sync"}
+                <Button onClick={handleForceSync} disabled={isSyncing} variant="outline" className="w-full border-strava/30 hover:bg-strava/10">
+                  {isSyncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  {isSyncing ? "Syncing..." : "Sync Activities"}
                 </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Re-import all activities with detailed metrics
-                </p>
 
-
+                {!showDisconnectConfirm ? (
+                  <button
+                    onClick={() => setShowDisconnectConfirm(true)}
+                    className="w-full text-xs text-muted-foreground hover:text-destructive transition-colors py-1"
+                  >
+                    Disconnect Strava
+                  </button>
+                ) : (
+                  <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+                    <p className="text-sm text-foreground font-medium">Remove all Strava data?</p>
+                    <p className="text-xs text-muted-foreground">This will delete all synced activities, stats, and achievements. Your profile will be kept.</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="destructive" onClick={handleDisconnectStrava} disabled={isDisconnecting} className="flex-1">
+                        {isDisconnecting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Unlink className="w-3 h-3 mr-1" />}
+                        Confirm
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowDisconnectConfirm(false)} className="flex-1">Cancel</Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </motion.div>
-        )}
+          ) : (
+            <Card className="border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <LinkIcon className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Not Connected</h3>
+                    <p className="text-muted-foreground text-sm">Link Strava to sync your runs</p>
+                  </div>
+                </div>
+                <Button onClick={handleConnectStrava} disabled={isConnectingStrava} className="w-full mt-4 bg-strava hover:bg-strava-dark text-white">
+                  {isConnectingStrava ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LinkIcon className="w-4 h-4 mr-2" />}
+                  Connect Strava
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+
+        {/* Change Password */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.42 }}
+        >
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Security
+          </h2>
+          <Card className="border-border/50">
+            <CardContent className="p-4">
+              {!showChangePassword ? (
+                <button
+                  onClick={() => setShowChangePassword(true)}
+                  className="w-full flex items-center gap-3 hover:bg-secondary/50 transition-colors text-left rounded-lg p-2 -m-2"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Change Password</p>
+                    <p className="text-muted-foreground text-sm">Update your login password</p>
+                  </div>
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Current Password</Label>
+                    <Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">New Password</Label>
+                    <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1" placeholder="Min 6 characters" />
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Confirm New Password</Label>
+                    <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="mt-1" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleChangePassword} disabled={isChangingPassword} className="flex-1">
+                      {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
+                      Save
+                    </Button>
+                    <Button variant="outline" onClick={() => { setShowChangePassword(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} className="flex-1">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Quick Links */}
         <motion.div
