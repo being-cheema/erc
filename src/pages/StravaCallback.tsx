@@ -90,21 +90,84 @@ const StravaCallback = () => {
 
       setSyncState({ step: "auth", message: "Signing you in...", progress: 20 });
 
-      // Store JWT token (replaces Supabase magic link)
+      // Store JWT token
       if (data.token) {
         api.setToken(data.token);
+      }
+      if (data.refresh_token) {
+        api.setRefreshToken(data.refresh_token);
       }
 
       const athleteName = data.athlete?.firstname || "Runner";
       const userId = data.user_id;
-      const isNewUser = data.is_new_user;
 
-      // No auto-sync — users trigger sync manually via Force Sync in Settings
+      // Trigger Strava sync
+      setSyncState({ step: "syncing", message: `Syncing your activities, ${athleteName}...`, progress: 30 });
+
+      try {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${data.token}`,
+            },
+          }
+        );
+      } catch {
+        // Sync request may fail but that's OK — we'll poll status
+      }
+
+      // Poll sync status
+      setSyncState({ step: "syncing", message: "Importing your runs from Strava...", progress: 40 });
+
+      let attempts = 0;
+      const maxAttempts = 120; // 2 minutes max
+
+      const pollSync = async (): Promise<void> => {
+        while (attempts < maxAttempts) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 1500));
+
+          try {
+            const statusRes = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava/status/${userId}`,
+              { headers: { Authorization: `Bearer ${data.token}` } }
+            );
+            const statusData = await statusRes.json();
+
+            if (statusData.status === "done") {
+              setSyncState({ step: "calculating", message: "Calculating your stats...", progress: 80 });
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              setSyncState({ step: "achievements", message: "Checking achievements...", progress: 90 });
+              await new Promise(resolve => setTimeout(resolve, 800));
+              break;
+            } else if (statusData.status === "error") {
+              console.warn("[sync] Background sync had an error:", statusData.error);
+              break;
+            } else {
+              // Still running — update progress
+              const progress = Math.min(40 + attempts * 0.5, 75);
+              setSyncState({
+                step: "syncing",
+                message: attempts > 20
+                  ? "Still syncing — you have a lot of runs! 🏃"
+                  : "Importing your runs from Strava...",
+                progress,
+              });
+            }
+          } catch {
+            // Network blip — keep polling
+          }
+        }
+      };
+
+      await pollSync();
+
       setSyncState({
         step: "complete",
-        message: isNewUser
-          ? `Welcome, ${athleteName}! Head to Settings to sync your activities.`
-          : `Welcome back, ${athleteName}!`,
+        message: `Welcome, ${athleteName}! Your data is ready.`,
         progress: 100,
       });
 
