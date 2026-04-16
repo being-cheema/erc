@@ -58,8 +58,12 @@ const Login = () => {
       api.setToken(data.token);
       if (data.refresh_token) api.setRefreshToken(data.refresh_token);
 
-      // Navigate to home
-      navigate("/home", { replace: true });
+      // Navigate based on Strava connection status
+      if (data.strava_connected) {
+        navigate("/home", { replace: true });
+      } else {
+        navigate("/connect-strava", { replace: true });
+      }
     } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {

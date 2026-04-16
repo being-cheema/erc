@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import StravaCallback from "./pages/StravaCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ConnectStrava from "./pages/ConnectStrava";
 import { api } from "@/integrations/supabase/client";
 
 // Smart root redirect — skip onboarding if already logged in
@@ -64,6 +65,7 @@ const AppContent = () => {
 
         {/* Protected routes — require authentication */}
         <Route element={<AuthRouter />}>
+          <Route path="/connect-strava" element={<ConnectStrava />} />
           <Route element={<AppLayout />}>
             <Route path="/home" element={<Home />} />
             <Route path="/races" element={<Races />} />
