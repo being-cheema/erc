@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ChevronRight, Calendar, Settings, Dumbbell } from "lucide-react";
+import { ChevronRight, Calendar, Settings, Dumbbell, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
@@ -14,7 +14,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import BentoStatsGrid from "@/components/home/BentoStatsGrid";
 import ActivityFeed from "@/components/home/ActivityFeed";
-
+import { Capacitor } from "@capacitor/core";
+import { api } from "@/integrations/supabase/client";
+import { useState } from "react";
 
 const motivationalLines = [
   { regular: "Keep pushing", bold: "your limits." },
@@ -137,6 +139,11 @@ const Home = () => {
       </motion.div>
 
       <div className="px-5 space-y-3">
+        {/* Strava Connect Banner — web only, not connected */}
+        {!Capacitor.isNativePlatform() && profile && !profile.strava_id && (
+          <StravaConnectBanner />
+        )}
+
         {/* Bento Stats - Distance + Calories */}
         <BentoStatsGrid />
 
@@ -235,6 +242,55 @@ const Home = () => {
         </motion.div>
       </div>
     </div>
+  );
+};
+
+// ─── Strava Connect Banner (web only) ───
+const StravaConnectBanner = () => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleConnect = async () => {
+    setIsLoading(true);
+    try {
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const token = api.getToken();
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}&link=1`;
+      
+      const response = await fetch(functionUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card p-4 border border-strava/30 bg-strava/5 cursor-pointer press-scale"
+      onClick={handleConnect}
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-strava/20 flex items-center justify-center flex-shrink-0">
+          <LinkIcon className="w-5 h-5 text-strava" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-foreground">Connect Strava</p>
+          <p className="text-xs text-muted-foreground">Link your account to sync runs & stats</p>
+        </div>
+        {isLoading ? (
+          <div className="w-5 h-5 rounded-full border-2 border-strava border-t-transparent animate-spin" />
+        ) : (
+          <ChevronRight className="w-5 h-5 text-strava" />
+        )}
+      </div>
+    </motion.div>
   );
 };
 

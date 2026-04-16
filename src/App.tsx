@@ -14,6 +14,8 @@ import AppLayout from "./components/layout/AppLayout";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
 import StravaCallback from "./pages/StravaCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { api } from "@/integrations/supabase/client";
 
 // Smart root redirect — skip onboarding if already logged in
@@ -56,6 +58,8 @@ const AppContent = () => {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<StravaCallback />} />
 
         {/* Protected routes — require authentication */}

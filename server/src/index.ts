@@ -19,6 +19,7 @@ import adminRouter from './routes/admin.js';
 import notificationsRouter from './routes/notifications.js';
 import webhookRouter from './routes/webhook.js';
 import refreshRouter from './routes/refresh.js';
+import authRouter from './routes/auth.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -63,6 +64,7 @@ app.use('/functions/v1/strava-auth', authLimiter, stravaAuthRouter);
 app.use('/functions/v1/sync-strava', syncStravaRouter);
 app.use('/functions/v1/disconnect-strava', disconnectStravaRouter);
 app.use('/api/auth/refresh', authLimiter, refreshRouter);
+app.use('/api/auth', authLimiter, authRouter);
 
 // REST API routes
 app.use('/api/profiles', profilesRouter);

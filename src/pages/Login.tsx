@@ -1,127 +1,74 @@
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef, forwardRef } from "react";
+import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
-import { Capacitor } from "@capacitor/core";
-import { Browser } from "@capacitor/browser";
+import { useNavigate, Link } from "react-router-dom";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
-  <svg
-    ref={ref}
-    viewBox="0 0 24 24"
-    className="w-5 h-5"
-    fill="currentColor"
-    {...props}
-  >
+  <svg ref={ref} viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" {...props}>
     <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
   </svg>
 ));
 StravaIcon.displayName = "StravaIcon";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading || !email || !password) return;
 
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    setIsLoading(false);
-  };
-
-  const handleStravaLogin = async () => {
-    if (isLoading) return; // Guard against double-tap
     setIsLoading(true);
     setError(null);
+    setNeedsPasswordSetup(false);
 
     try {
-      const isNative = Capacitor.isNativePlatform();
-      const redirectUri = isNative
-        ? `${import.meta.env.VITE_SUPABASE_URL}/auth/strava/callback`
-        : `${window.location.origin}/auth/callback`;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password }),
+        }
+      );
 
-      const stateId = isNative ? crypto.randomUUID() : '';
-      const stateParam = stateId ? `&state=${stateId}` : '';
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}${stateParam}`;
-
-      const response = await fetch(functionUrl);
       const data = await response.json();
 
-      if (data.url) {
-        if (isNative) {
-          try {
-            // Listen for browser close — stop polling if user cancels
-            const browserListener = await Browser.addListener("browserFinished", () => {
-              stopPolling();
-              browserListener.remove();
-            });
-
-            await Browser.open({ url: data.url });
-          } catch (browserError) {
-            console.error("Browser.open failed:", browserError);
-            window.open(data.url, "_system");
-          }
-
-          // Cancel any existing poll from a previous attempt
-          if (pollRef.current) clearInterval(pollRef.current);
-
-          // Poll the server for the token
-          const pollUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth/poll?state=${stateId}`;
-          const maxAttempts = 120;
-          let attempts = 0;
-
-          pollRef.current = setInterval(async () => {
-            attempts++;
-            try {
-              const pollRes = await fetch(pollUrl);
-              const pollData = await pollRes.json();
-
-              if (pollData.ready && pollData.token) {
-                stopPolling();
-                api.setToken(pollData.token);
-                if (pollData.refresh_token) api.setRefreshToken(pollData.refresh_token);
-                try { await Browser.close(); } catch { /* may already be closed */ }
-                // Navigate to sync screen (same page as browser flow) with native flag
-                // StravaCallback will skip code exchange and just do the sync + polling
-                window.location.href = `/auth/callback?native=1&user_id=${pollData.user_id || ''}&athlete_name=${encodeURIComponent(pollData.athlete_name || 'Runner')}&is_new_user=${pollData.is_new_user ? '1' : '0'}&token=${encodeURIComponent(pollData.token)}`;
-              }
-            } catch {
-              // Network error, keep polling
-            }
-
-            if (attempts >= maxAttempts) {
-              stopPolling();
-              setError("Login timed out. Please try again.");
-            }
-          }, 1500);
+      if (!response.ok) {
+        if (data.error === "no_password_set") {
+          setNeedsPasswordSetup(true);
+          setError(data.message);
         } else {
-          window.location.href = data.url;
+          setError(data.error || "Login failed");
         }
-      } else {
-        console.error("No auth URL received:", data.error);
-        setIsLoading(false);
-        setError("Could not connect to Strava. Please try again.");
+        return;
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      setIsLoading(false);
+
+      // Store tokens
+      api.setToken(data.token);
+      if (data.refresh_token) api.setRefreshToken(data.refresh_token);
+
+      // Navigate to home
+      navigate("/home", { replace: true });
+    } catch (err) {
       setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Hero Section */}
       <div className="flex-1 flex flex-col justify-center px-6 safe-area-inset-top">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -129,7 +76,7 @@ const Login = () => {
           transition={{ duration: 0.5 }}
           className="w-full max-w-sm mx-auto"
         >
-          <div className="glass-card p-8 space-y-10">
+          <div className="glass-card p-8 space-y-8">
             {/* Logo */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -137,11 +84,7 @@ const Login = () => {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="flex justify-center"
             >
-              <img
-                src={logo}
-                alt="Erode Runners Club"
-                className="h-24 w-auto object-contain"
-              />
+              <img src={logo} alt="Erode Runners Club" className="h-24 w-auto object-contain" />
             </motion.div>
 
             {/* Title */}
@@ -149,30 +92,88 @@ const Login = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="text-center space-y-4"
+              className="text-center space-y-3"
             >
-              <h1 className="text-6xl font-black uppercase tracking-tighter text-foreground leading-none">
+              <h1 className="text-5xl font-black uppercase tracking-tighter text-foreground leading-none">
                 Run to Live.
               </h1>
               <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
                 Erode Runners Club
               </p>
-              <p className="text-base text-muted-foreground font-medium">
-                Track your runs. Compete with the community.
-              </p>
             </motion.div>
 
-            {/* Login Button */}
-            <motion.div
+            {/* Login Form */}
+            <motion.form
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              className="space-y-4"
+              transition={{ delay: 0.4, duration: 0.5 }}
+              onSubmit={handleLogin}
+              className="space-y-5"
             >
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Email
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-12 bg-background/50 border-border/50 rounded-xl"
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 h-12 bg-background/50 border-border/50 rounded-xl"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error / Info */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`text-sm text-center p-3 rounded-lg ${
+                    needsPasswordSetup
+                      ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                      : "bg-red-500/10 text-red-400 border border-red-500/20"
+                  }`}
+                >
+                  {error}
+                </motion.div>
+              )}
+
               <Button
-                onClick={handleStravaLogin}
-                disabled={isLoading}
-                className="w-full h-16 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-xl disabled:opacity-50 transition-all"
+                type="submit"
+                disabled={isLoading || !email || !password}
+                className="w-full h-14 text-base font-bold uppercase tracking-wide bg-strava hover:bg-strava-dark text-white rounded-xl disabled:opacity-50 transition-all"
               >
                 {isLoading ? (
                   <motion.div
@@ -181,23 +182,24 @@ const Login = () => {
                     className="w-5 h-5 rounded-full border-2 border-white border-t-transparent"
                   />
                 ) : (
-                  <>
-                    <StravaIcon />
-                    <span className="ml-2">Connect with Strava</span>
-                  </>
+                  "Log In"
                 )}
               </Button>
 
-              <p className="text-center text-xs text-muted-foreground leading-relaxed">
-                We sync your runs from Strava to show stats and rankings.
-              </p>
-
-              {error && (
-                <p className="text-center text-sm text-red-400 font-medium">
-                  {error}
-                </p>
-              )}
-            </motion.div>
+              <div className="text-center">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-strava hover:text-strava-dark font-medium transition-colors"
+                >
+                  Forgot Password?
+                </Link>
+                {needsPasswordSetup && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    First time? Click "Forgot Password" above to set up your password.
+                  </p>
+                )}
+              </div>
+            </motion.form>
           </div>
         </motion.div>
       </div>
