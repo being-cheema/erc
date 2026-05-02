@@ -1,15 +1,6 @@
-import { useState, useEffect, useSyncExternalStore, useCallback } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Navigate, Outlet } from "react-router-dom";
 import { api } from "@/integrations/supabase/client";
-
-// Mark onboarding as complete in localStorage
-export function markOnboardingComplete() {
-  localStorage.setItem('onboarding_complete', 'true');
-}
-
-export function isOnboardingComplete(): boolean {
-  return localStorage.getItem('onboarding_complete') === 'true';
-}
 
 const AuthRouter = () => {
   // Check auth synchronously — no useEffect, no state update loop

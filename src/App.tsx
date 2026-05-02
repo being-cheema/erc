@@ -11,7 +11,6 @@ import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import AppLayout from "./components/layout/AppLayout";
 
 // Eagerly loaded — first screens users see
-import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
@@ -26,8 +25,7 @@ import { isWeb } from "@/utils/platform";
 const RootRedirect = () => {
   const isAuthenticated = !!api.getUser();
   if (isAuthenticated) return <Navigate to="/home" replace />;
-  // Web → landing page, Native → onboarding/login
-  return <Navigate to={isWeb() ? "/landing" : "/onboarding"} replace />;
+  return <Navigate to={isWeb() ? "/landing" : "/login"} replace />;
 };
 
 // Lazy loaded — only fetched when user navigates to these routes
@@ -64,7 +62,6 @@ const AppContent = () => {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/landing" element={<Landing />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
