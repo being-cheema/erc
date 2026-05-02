@@ -446,7 +446,7 @@ const Landing = () => {
             <img src={logo} alt="ERC" className="h-7 w-auto opacity-40" />
             <span className="text-xs text-white/20 font-medium">© {new Date().getFullYear()} Erode Runners Club</span>
           </div>
-          <p className="text-xs text-white/15">Built with ❤️ for runners, by runners.</p>
+          <p className="text-xs text-white/15">Built for runners, by runners.</p>
         </div>
       </footer>
     </div>

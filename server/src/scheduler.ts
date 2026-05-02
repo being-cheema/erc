@@ -161,7 +161,7 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
 export async function runScheduledSync() {
     const budget = getUserSyncBudget(CALLS_PER_USER);
     if (budget <= 0) {
-        console.log(`⏰ [${new Date().toISOString()}] Skipping sync — rate limit budget exhausted (${getUsageStats()})`);
+        console.log(`[sync] [${new Date().toISOString()}] Skipping sync — rate limit budget exhausted (${getUsageStats()})`);
         return;
     }
 
@@ -182,7 +182,7 @@ export async function runScheduledSync() {
             return;
         }
 
-        console.log(`⏰ [${new Date().toISOString()}] Syncing batch of ${profiles.length} users (${getUsageStats()})`);
+        console.log(`[sync] [${new Date().toISOString()}] Syncing batch of ${profiles.length} users (${getUsageStats()})`);
 
         let successCount = 0;
         let failCount = 0;
@@ -191,7 +191,7 @@ export async function runScheduledSync() {
         for (const profile of profiles) {
             // Check budget before each user
             if (!canMakeCalls(CALLS_PER_USER)) {
-                console.log(`  ⚠️  Rate limit reached mid-batch, stopping. (${getUsageStats()})`);
+                console.log(`  [warn] Rate limit reached mid-batch, stopping. (${getUsageStats()})`);
                 break;
             }
 
@@ -211,16 +211,16 @@ export async function runScheduledSync() {
             await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
-        console.log(`⏰ Batch done: ${successCount} ok, ${failCount} fail, ${newActivityCount} new activities (${getUsageStats()})`);
+        console.log(`[sync] Batch done: ${successCount} ok, ${failCount} fail, ${newActivityCount} new activities (${getUsageStats()})`);
     } catch (error) {
-        console.error('⏰ Scheduled sync error:', error);
+        console.error('[sync] Scheduled sync error:', error);
     }
 }
 
 export function startScheduledSync() {
     const batchesPerDay = (24 * 60 * 60 * 1000) / BATCH_INTERVAL_MS;
-    console.log(`⏰ Safety net sync: every ${BATCH_INTERVAL_MS / (60 * 60 * 1000)}h (primary sync via webhooks)`);
-    console.log(`⏰ Budget: 2,800 reads/day usable, ~${CALLS_PER_USER} calls/user`);
+    console.log(`[sync] Safety net sync: every ${BATCH_INTERVAL_MS / (60 * 60 * 1000)}h (primary sync via webhooks)`);
+    console.log(`[sync] Budget: 2,800 reads/day usable, ~${CALLS_PER_USER} calls/user`);
 
     // First sync 30 seconds after startup
     setTimeout(() => runScheduledSync(), 30_000);

@@ -94,10 +94,10 @@ const ActivityList = () => {
                       </span>
                     )}
                     {activity.kudos_count > 0 && (
-                      <span>👏 {activity.kudos_count} kudos</span>
+                      <span>{activity.kudos_count} kudos</span>
                     )}
                     {activity.achievement_count > 0 && (
-                      <span>🏆 {activity.achievement_count} achievements</span>
+                      <span>{activity.achievement_count} achievements</span>
                     )}
                   </div>
                 )}

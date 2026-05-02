@@ -255,16 +255,21 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
                     to: email.trim(),
                     subject: 'Reset your Erode Runners Club password',
                     html: `
-                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #111; border-radius: 16px;">
-                            <h2 style="color: #fff; text-align: center; font-size: 24px; margin-bottom: 8px;">🏃 Erode Runners Club</h2>
-                            <p style="color: #999; text-align: center; margin-bottom: 32px;">Password Reset</p>
-                            <p style="color: #ccc; line-height: 1.6;">Hi there! Click the button below to set your password:</p>
-                            <div style="text-align: center; margin: 32px 0;">
-                                <a href="${resetUrl}" style="background: #FC4C02; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Set Password</a>
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 0;">
+                            <div style="background: #111; padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;">
+                                <h1 style="color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 0.05em; margin: 0; text-transform: uppercase;">Erode Runners Club</h1>
                             </div>
-                            <p style="color: #666; font-size: 13px; line-height: 1.5;">This link expires in 1 hour. If you didn't request this, just ignore this email.</p>
-                            <hr style="border: none; border-top: 1px solid #333; margin: 24px 0;">
-                            <p style="color: #444; font-size: 11px; text-align: center;">Erode Runners Club</p>
+                            <div style="background: #fff; padding: 36px 32px; border-left: 1px solid #e5e5e5; border-right: 1px solid #e5e5e5;">
+                                <h2 style="color: #111; font-size: 22px; font-weight: 700; margin: 0 0 12px;">Reset your password</h2>
+                                <p style="color: #555; font-size: 15px; line-height: 1.6; margin: 0 0 28px;">We received a request to reset your password. Tap the button below to choose a new one.</p>
+                                <div style="text-align: center; margin: 0 0 28px;">
+                                    <a href="${resetUrl}" style="background: #FC4C02; color: #fff; padding: 14px 40px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block;">Reset Password</a>
+                                </div>
+                                <p style="color: #999; font-size: 13px; line-height: 1.5; margin: 0;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+                            </div>
+                            <div style="padding: 16px 32px; text-align: center; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px; background: #fafafa;">
+                                <p style="color: #aaa; font-size: 11px; margin: 0;">Erode Runners Club &middot; eroderunnersclub.com</p>
+                            </div>
                         </div>
                     `,
                 });

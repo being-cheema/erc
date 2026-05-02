@@ -3,7 +3,7 @@ import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
-import { Link as LinkIcon, LogOut } from "lucide-react";
+import { Link as LinkIcon, LogOut, BarChart3, Trophy, Flame } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
@@ -158,12 +158,12 @@ const ConnectStrava = () => {
               className="space-y-3"
             >
               {[
-                { emoji: "📊", text: "Auto-sync all your running activities" },
-                { emoji: "🏆", text: "Compete on the club leaderboard" },
-                { emoji: "🔥", text: "Track streaks, achievements & stats" },
+                { icon: BarChart3, text: "Auto-sync all your running activities" },
+                { icon: Trophy, text: "Compete on the club leaderboard" },
+                { icon: Flame, text: "Track streaks, achievements & stats" },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <span className="text-lg">{item.emoji}</span>
+                  <item.icon className="w-4 h-4 text-strava shrink-0" />
                   <span>{item.text}</span>
                 </div>
               ))}

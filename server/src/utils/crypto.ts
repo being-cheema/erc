@@ -6,7 +6,7 @@ const AUTH_TAG_LENGTH = 16;
 
 const KEY_HEX = process.env.TOKEN_ENCRYPTION_KEY;
 if (!KEY_HEX || KEY_HEX.length !== 64) {
-    console.warn('⚠️  TOKEN_ENCRYPTION_KEY not set or invalid — token encryption disabled');
+    console.warn('[crypto] TOKEN_ENCRYPTION_KEY not set or invalid — token encryption disabled');
 }
 
 const KEY = KEY_HEX ? Buffer.from(KEY_HEX, 'hex') : null;

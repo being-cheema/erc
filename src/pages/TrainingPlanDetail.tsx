@@ -92,7 +92,7 @@ const TrainingPlanDetail = () => {
       const wasCompleted = completedWorkoutIds.includes(workoutId);
       if (!wasCompleted) {
         notificationSuccess();
-        toast.success("Workout completed! 💪");
+        toast.success("Workout completed!");
       } else {
         lightImpact();
       }

@@ -152,7 +152,7 @@ const StravaCallback = () => {
               setSyncState({
                 step: "syncing",
                 message: attempts > 20
-                  ? "Still syncing — you have a lot of runs! 🏃"
+                  ? "Still syncing — you have a lot of runs!"
                   : "Importing your runs from Strava...",
                 progress,
               });

@@ -86,7 +86,7 @@ app.use((_req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🏃 Erode Runners API running on port ${PORT}`);
+    console.log(`[api] Erode Runners API running on port ${PORT}`);
 
     // Start scheduled Strava sync (every 6h by default)
     import('./scheduler.js').then(({ startScheduledSync }) => {

@@ -24,7 +24,7 @@ const getIconEmoji = (icon: string) => {
   if (icon && icon.length <= 4) {
     return icon;
   }
-  return "🏆";
+  return "★";
 };
 
 const Achievements = () => {
