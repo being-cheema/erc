@@ -83,9 +83,10 @@ const AppContent = () => {
             <Route path="/admin" element={<Admin />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
-          {/* Unknown routes for authenticated users */}
-          <Route path="*" element={<NotFound />} />
         </Route>
+
+        {/* Fallback for unknown routes — redirect to root */}
+        <Route path="*" element={<RootRedirect />} />
       </Routes>
     </Suspense>
   );

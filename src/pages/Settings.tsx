@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield, Link as LinkIcon, Unlink, Lock, Mail } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield, Link as LinkIcon, Unlink, Lock, Mail, Download, Smartphone, Apple } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { isWeb } from "@/utils/platform";
 
 interface NotificationPreferences {
   achievements: boolean;
@@ -559,6 +560,50 @@ const Settings = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Download App - Web only */}
+        {isWeb() && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.44 }}
+          >
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Get the App
+            </h2>
+            <Card className="border-border/50">
+              <CardContent className="p-0">
+                <a
+                  href="/downloads/erode-runners-club.apk"
+                  className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <Smartphone className="w-4 h-4 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Android</p>
+                    <p className="text-xs text-muted-foreground">Download APK</p>
+                  </div>
+                </a>
+                <a
+                  href="https://testflight.apple.com/join/DBkSDDWn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Apple className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">iOS <span className="text-xs text-muted-foreground">(Beta)</span></p>
+                    <p className="text-xs text-muted-foreground">Via TestFlight</p>
+                  </div>
+                </a>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Quick Links */}
         <motion.div

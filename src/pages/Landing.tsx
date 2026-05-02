@@ -15,8 +15,11 @@ import {
   Calendar,
   ArrowRight,
   Activity,
+  Download,
+  X,
+  ChevronDown,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 const stats = [
   { value: "50+", label: "Active Runners" },
@@ -69,6 +72,7 @@ const Landing = () => {
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
+  const [showDownload, setShowDownload] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-strava/30 selection:text-white">
@@ -77,7 +81,7 @@ const Landing = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="fixed top-0 left-0 right-0 z-50 px-6 py-4"
+        className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[#050505]/80 backdrop-blur-xl border-b border-white/[0.04]"
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -86,7 +90,69 @@ const Landing = () => {
               Erode Runners Club
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Download button */}
+            <div className="relative">
+              <Button
+                onClick={() => setShowDownload(!showDownload)}
+                variant="ghost"
+                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl text-sm font-semibold gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Download</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showDownload ? "rotate-180" : ""}`} />
+              </Button>
+
+              {/* Download dropdown */}
+              {showDownload && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowDownload(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-72 rounded-2xl bg-[#111] border border-white/[0.08] shadow-2xl shadow-black/50 overflow-hidden z-50"
+                  >
+                    <div className="p-2">
+                      <a
+                        href="/downloads/erode-runners-club.apk"
+                        className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.05] transition-colors"
+                        onClick={() => setShowDownload(false)}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shrink-0">
+                          <Smartphone className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white">Android</p>
+                          <p className="text-xs text-white/40">Download APK directly</p>
+                        </div>
+                      </a>
+                      <a
+                        href="https://testflight.apple.com/join/DBkSDDWn"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.05] transition-colors"
+                        onClick={() => setShowDownload(false)}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+                          <Apple className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white">iOS <span className="text-[10px] text-white/30 uppercase tracking-wider ml-1">Beta</span></p>
+                          <p className="text-xs text-white/40">Via TestFlight</p>
+                        </div>
+                      </a>
+                    </div>
+                    <div className="px-4 py-3 border-t border-white/[0.05] bg-white/[0.02]">
+                      <p className="text-[10px] text-white/20 leading-relaxed">
+                        iOS: Install <a href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noopener noreferrer" className="text-blue-400/50 hover:text-blue-400 underline underline-offset-2">TestFlight</a> first, then tap iOS above.
+                      </p>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </div>
+
             <Button
               onClick={() => navigate("/login")}
               variant="ghost"
