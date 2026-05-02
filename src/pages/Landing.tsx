@@ -227,11 +227,18 @@ const Landing = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/signup")}
               className="h-14 px-10 text-base font-bold uppercase tracking-wider bg-white text-black hover:bg-white/90 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-white/10"
             >
-              Member Login
+              Member Sign Up
               <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+            <Button
+              onClick={() => navigate("/login")}
+              variant="ghost"
+              className="h-14 px-10 text-base font-semibold text-white/50 hover:text-white hover:bg-white/5 rounded-2xl transition-all"
+            >
+              Already registered? Log in
             </Button>
           </div>
         </motion.div>
@@ -413,18 +420,18 @@ const Landing = () => {
               </motion.div>
 
               <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tight leading-[0.9] mb-5">
-                Already a
+                Ready to
                 <br />
-                member?
+                join us?
               </h2>
               <p className="text-white/35 mb-10 max-w-md mx-auto text-base leading-relaxed">
-                Log in to track your runs, compete on the leaderboard, and connect with the club.
+                Create your account, connect Strava, and start competing with the club.
               </p>
               <Button
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/signup")}
                 className="h-14 px-12 text-base font-bold uppercase tracking-wider bg-white text-black hover:bg-white/90 rounded-2xl shadow-2xl shadow-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Log In
+                Sign Up
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </div>
