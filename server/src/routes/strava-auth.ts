@@ -155,10 +155,15 @@ router.get('/', async (req: Request, res: Response) => {
             }
 
             // Link Strava to the existing user's profile (upsert)
+            // User-set name/avatar/city always win — Strava only fills blanks
             const currentProfile = await pool.query(
-                'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1',
+                'SELECT display_name, avatar_url, city FROM profiles WHERE user_id = $1',
                 [userId]
             );
+
+            const fallbackName = currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`;
+            const fallbackAvatar = currentProfile.rows[0]?.avatar_url || athlete.profile;
+            const fallbackCity = currentProfile.rows[0]?.city || athlete.city || null;
 
             await pool.query(
                 `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
@@ -170,16 +175,16 @@ router.get('/', async (req: Request, res: Response) => {
                     strava_token_expires_at = $5,
                     display_name = COALESCE(NULLIF(profiles.display_name, ''), $6),
                     avatar_url = COALESCE(NULLIF(profiles.avatar_url, ''), $7),
-                    city = $8`,
+                    city = COALESCE(NULLIF(profiles.city, ''), $8)`,
                 [
                     userId,
                     athlete.id.toString(),
                     encryptToken(access_token),
                     encryptToken(refresh_token),
                     new Date(expires_at * 1000).toISOString(),
-                    currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
-                    currentProfile.rows[0]?.avatar_url || athlete.profile,
-                    athlete.city || null,
+                    fallbackName,
+                    fallbackAvatar,
+                    fallbackCity,
                 ]
             );
 

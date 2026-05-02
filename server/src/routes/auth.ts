@@ -23,6 +23,84 @@ const transporter = nodemailer.createTransport({
 const APP_URL = process.env.APP_URL || 'https://eroderunnersclub.com';
 const SMTP_FROM = process.env.SMTP_FROM || 'Erode Runners Club <noreply@eroderunnersclub.com>';
 
+// ─── POST /api/auth/signup ───
+router.post('/signup', async (req: Request, res: Response) => {
+    try {
+        const { email, password, display_name, phone } = req.body;
+
+        if (!email || !password || !display_name) {
+            return res.status(400).json({ error: 'Email, password, and name are required' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+        const trimmedEmail = email.trim().toLowerCase();
+
+        // Check if email already exists
+        const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [trimmedEmail]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+
+        // Create user + profile + role in a transaction
+        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const userResult = await client.query(
+                'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
+                [trimmedEmail, passwordHash]
+            );
+            const userId = userResult.rows[0].id;
+
+            await client.query(
+                `INSERT INTO profiles (user_id, display_name)
+                 VALUES ($1, $2)`,
+                [userId, display_name.trim()]
+            );
+
+            await client.query(
+                'INSERT INTO user_roles (user_id, role) VALUES ($1, $2)',
+                [userId, 'member']
+            );
+
+            await client.query('COMMIT');
+
+            // Auto-login: generate tokens
+            const token = signToken({ user_id: userId, email: trimmedEmail, role: 'member' });
+            const refreshToken = generateRefreshToken();
+            const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+            await pool.query(
+                'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+                [userId, refreshToken, refreshExpiresAt.toISOString()]
+            );
+
+            console.log(`[auth] New user signed up: ${trimmedEmail}`);
+
+            return res.status(201).json({
+                success: true,
+                token,
+                refresh_token: refreshToken,
+                user_id: userId,
+                strava_connected: false,
+            });
+        } catch (txError) {
+            await client.query('ROLLBACK');
+            throw txError;
+        } finally {
+            client.release();
+        }
+    } catch (error: any) {
+        console.error('[auth] Signup error:', error);
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'An account with this email already exists' });
+        }
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ─── POST /api/auth/login ───
 router.post('/login', async (req: Request, res: Response) => {
     try {

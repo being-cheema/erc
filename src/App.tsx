@@ -13,16 +13,21 @@ import AppLayout from "./components/layout/AppLayout";
 // Eagerly loaded — first screens users see
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
+import Signup from "./pages/Signup";
 import StravaCallback from "./pages/StravaCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConnectStrava from "./pages/ConnectStrava";
 import { api } from "@/integrations/supabase/client";
+import { isWeb } from "@/utils/platform";
 
-// Smart root redirect — skip onboarding if already logged in
+// Smart root redirect — platform-aware
 const RootRedirect = () => {
   const isAuthenticated = !!api.getUser();
-  return <Navigate to={isAuthenticated ? "/home" : "/onboarding"} replace />;
+  if (isAuthenticated) return <Navigate to="/home" replace />;
+  // Web → landing page, Native → onboarding/login
+  return <Navigate to={isWeb() ? "/landing" : "/onboarding"} replace />;
 };
 
 // Lazy loaded — only fetched when user navigates to these routes
@@ -57,6 +62,8 @@ const AppContent = () => {
       <Routes>
         {/* Public routes — no auth required */}
         <Route path="/" element={<RootRedirect />} />
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

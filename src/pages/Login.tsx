@@ -7,6 +7,7 @@ import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { isWeb } from "@/utils/platform";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg ref={ref} viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" {...props}>
@@ -190,7 +191,7 @@ const Login = () => {
                 )}
               </Button>
 
-              <div className="text-center">
+              <div className="text-center space-y-3">
                 <Link
                   to="/forgot-password"
                   className="text-sm text-strava hover:text-strava-dark font-medium transition-colors"
@@ -198,8 +199,16 @@ const Login = () => {
                   Forgot Password?
                 </Link>
                 {needsPasswordSetup && (
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     First time? Click "Forgot Password" above to set up your password.
+                  </p>
+                )}
+                {isWeb() && (
+                  <p className="text-sm text-muted-foreground">
+                    Don't have an account?{" "}
+                    <Link to="/signup" className="text-strava hover:text-strava-dark font-medium transition-colors">
+                      Sign up
+                    </Link>
                   </p>
                 )}
               </div>

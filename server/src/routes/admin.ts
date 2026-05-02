@@ -151,4 +151,28 @@ router.put('/users/:id/role', async (req: Request, res: Response) => {
     }
 });
 
+// DELETE /api/admin/users/:id — remove a user and all their data
+router.delete('/users/:id', async (req: Request, res: Response) => {
+    try {
+        const targetId = req.params.id;
+
+        // Prevent admin from deleting themselves
+        if (targetId === req.user!.user_id) {
+            return res.status(400).json({ error: 'You cannot delete your own account' });
+        }
+
+        // CASCADE on FK constraints handles activities, profiles, tokens, etc.
+        const result = await pool.query('DELETE FROM users WHERE id = $1', [targetId]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log(`[admin] User ${targetId} deleted by admin ${req.user!.user_id}`);
+        return res.json({ success: true, message: 'User and all associated data deleted' });
+    } catch (err) {
+        console.error('[admin] Delete user error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
