@@ -203,14 +203,6 @@ const Login = () => {
                     First time? Click "Forgot Password" above to set up your password.
                   </p>
                 )}
-                {isWeb() && (
-                  <p className="text-sm text-muted-foreground">
-                    Don't have an account?{" "}
-                    <Link to="/signup" className="text-strava hover:text-strava-dark font-medium transition-colors">
-                      Sign up
-                    </Link>
-                  </p>
-                )}
               </div>
             </motion.form>
           </div>

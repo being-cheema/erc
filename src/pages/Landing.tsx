@@ -160,12 +160,6 @@ const Landing = () => {
             >
               Log In
             </Button>
-            <Button
-              onClick={() => navigate("/signup")}
-              className="bg-strava hover:bg-strava/90 text-white rounded-xl text-sm font-semibold px-5 h-9 shadow-lg shadow-strava/20"
-            >
-              Join
-            </Button>
           </div>
         </div>
       </motion.nav>
@@ -215,7 +209,7 @@ const Landing = () => {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] mb-8"
           >
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Now accepting members</span>
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Members only</span>
           </motion.div>
 
           <h1 className="text-6xl sm:text-8xl lg:text-9xl font-black uppercase tracking-[-0.04em] leading-[0.85] mb-8">
@@ -228,23 +222,16 @@ const Landing = () => {
           <p className="text-lg sm:text-xl text-white/40 max-w-lg mx-auto mb-12 leading-relaxed font-medium">
             Track your runs. Climb the leaderboard. Earn achievements.
             <br className="hidden sm:block" />
-            Join Erode's fastest-growing running community.
+            An exclusive platform for Erode Runners Club members.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
-              onClick={() => navigate("/signup")}
+              onClick={() => navigate("/login")}
               className="h-14 px-10 text-base font-bold uppercase tracking-wider bg-white text-black hover:bg-white/90 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-white/10"
             >
-              Create Free Account
+              Member Login
               <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-            <Button
-              onClick={() => navigate("/login")}
-              variant="ghost"
-              className="h-14 px-10 text-base font-semibold text-white/50 hover:text-white hover:bg-white/5 rounded-2xl transition-all"
-            >
-              I already have an account
             </Button>
           </div>
         </motion.div>
@@ -426,18 +413,18 @@ const Landing = () => {
               </motion.div>
 
               <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tight leading-[0.9] mb-5">
-                Your next
+                Already a
                 <br />
-                run starts here.
+                member?
               </h2>
               <p className="text-white/35 mb-10 max-w-md mx-auto text-base leading-relaxed">
-                Free to join. Connect your Strava. Start competing with the club today.
+                Log in to track your runs, compete on the leaderboard, and connect with the club.
               </p>
               <Button
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate("/login")}
                 className="h-14 px-12 text-base font-bold uppercase tracking-wider bg-white text-black hover:bg-white/90 rounded-2xl shadow-2xl shadow-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Get Started — It's Free
+                Log In
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </div>
