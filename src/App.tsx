@@ -40,6 +40,8 @@ const TrainingPlanDetail = lazy(() => import("./pages/TrainingPlanDetail"));
 const Achievements = lazy(() => import("./pages/Achievements"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Challenges = lazy(() => import("./pages/Challenges"));
+const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Minimal loading spinner for lazy routes
@@ -80,6 +82,8 @@ const AppContent = () => {
             <Route path="/training" element={<Training />} />
             <Route path="/training/:planId" element={<TrainingPlanDetail />} />
             <Route path="/achievements" element={<Achievements />} />
+            <Route path="/challenges" element={<Challenges />} />
+            <Route path="/challenges/:id" element={<ChallengeDetail />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

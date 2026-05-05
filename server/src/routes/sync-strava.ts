@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import { recordCalls, canMakeCalls, updateFromHeaders, getUsageStats } from '../rate-limiter.js';
+import { recalculateAllChallenges } from './challenges.js';
 
 const router = Router();
 
@@ -473,6 +474,9 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
             const newAchievements = await checkAndUnlockAchievements(profile.user_id, {
                 totalDistance, totalRuns: totalRunsCount, currentStreak, longestStreak,
             });
+
+            // Recalculate challenge progress
+            await recalculateAllChallenges(profile.user_id);
 
             syncStatusMap.set(profile.user_id, {
                 status: 'done',

@@ -121,6 +121,60 @@ router.delete('/training/:id', async (req: Request, res: Response) => {
     }
 });
 
+// ── CHALLENGES CRUD ──
+router.post('/challenges', async (req: Request, res: Response) => {
+    try {
+        const { title, description, challenge_type, target_value, target_unit, start_date, end_date, count_from, is_published } = req.body;
+        const { rows } = await pool.query(
+            `INSERT INTO challenges (title, description, challenge_type, target_value, target_unit, start_date, end_date, count_from, is_published, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [title, description, challenge_type, target_value, target_unit, start_date, end_date || null, count_from || 'challenge_start', is_published || false, req.user!.user_id]
+        );
+        return res.status(201).json(rows[0]);
+    } catch (err) {
+        console.error('[admin] Create challenge error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/challenges', async (_req: Request, res: Response) => {
+    try {
+        const { rows } = await pool.query(
+            `SELECT c.*,
+                    (SELECT COUNT(*) FROM challenge_participants cp WHERE cp.challenge_id = c.id) as participant_count
+             FROM challenges c
+             ORDER BY c.created_at DESC`
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/challenges/:id', async (req: Request, res: Response) => {
+    try {
+        const { title, description, challenge_type, target_value, target_unit, start_date, end_date, count_from, is_published } = req.body;
+        const { rows } = await pool.query(
+            `UPDATE challenges SET title=$1, description=$2, challenge_type=$3, target_value=$4, target_unit=$5, start_date=$6, end_date=$7, count_from=$8, is_published=$9
+             WHERE id=$10 RETURNING *`,
+            [title, description, challenge_type, target_value, target_unit, start_date, end_date || null, count_from || 'challenge_start', is_published, req.params.id]
+        );
+        return res.json(rows[0]);
+    } catch (err) {
+        console.error('[admin] Update challenge error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.delete('/challenges/:id', async (req: Request, res: Response) => {
+    try {
+        await pool.query('DELETE FROM challenges WHERE id = $1', [req.params.id]);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ── USER ROLE MANAGEMENT ──
 router.get('/users', async (_req: Request, res: Response) => {
     try {

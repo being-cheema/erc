@@ -20,6 +20,7 @@ import notificationsRouter from './routes/notifications.js';
 import webhookRouter from './routes/webhook.js';
 import refreshRouter from './routes/refresh.js';
 import authRouter from './routes/auth.js';
+import challengesRouter from './routes/challenges.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -76,6 +77,7 @@ app.use('/api/blog', blogRouter);
 app.use('/api/training', trainingRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/challenges', challengesRouter);
 
 // Strava webhook — outside /functions/ namespace, Strava hits this directly
 app.use('/webhook', webhookRouter);

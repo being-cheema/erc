@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X,
-  ArrowLeft, Loader2, Calendar, AlertTriangle
+  ArrowLeft, Loader2, Calendar, AlertTriangle, Flame
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,20 @@ interface TrainingPlan {
   is_published: boolean | null;
 }
 
+interface AdminChallenge {
+  id: string;
+  title: string;
+  description: string | null;
+  challenge_type: string;
+  target_value: number;
+  target_unit: string;
+  start_date: string;
+  end_date: string | null;
+  count_from: string;
+  is_published: boolean | null;
+  participant_count: number;
+}
+
 const Admin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -99,6 +113,12 @@ const Admin = () => {
     enabled: isAdmin === true,
   });
 
+  const { data: challengesList, isLoading: challengesLoading } = useQuery({
+    queryKey: ["admin", "challenges"],
+    queryFn: () => api.get('/api/admin/challenges'),
+    enabled: isAdmin === true,
+  });
+
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -127,23 +147,31 @@ const Admin = () => {
 
       <div className="px-4 py-6">
         <Tabs defaultValue="races" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="races" className="gap-2">
-              <Trophy className="w-4 h-4" />
+          <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsTrigger value="races" className="gap-1 text-xs">
+              <Trophy className="w-3.5 h-3.5" />
               Races
             </TabsTrigger>
-            <TabsTrigger value="blog" className="gap-2">
-              <BookOpen className="w-4 h-4" />
+            <TabsTrigger value="challenges" className="gap-1 text-xs">
+              <Flame className="w-3.5 h-3.5" />
+              Dares
+            </TabsTrigger>
+            <TabsTrigger value="blog" className="gap-1 text-xs">
+              <BookOpen className="w-3.5 h-3.5" />
               Blog
             </TabsTrigger>
-            <TabsTrigger value="training" className="gap-2">
-              <Target className="w-4 h-4" />
+            <TabsTrigger value="training" className="gap-1 text-xs">
+              <Target className="w-3.5 h-3.5" />
               Training
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="races">
             <RacesAdmin races={races || []} loading={racesLoading} />
+          </TabsContent>
+
+          <TabsContent value="challenges">
+            <ChallengesAdmin challenges={challengesList || []} loading={challengesLoading} />
           </TabsContent>
 
           <TabsContent value="blog">
@@ -604,3 +632,154 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
 };
 
 export default Admin;
+
+// Challenges Admin Component
+const ChallengesAdmin = ({ challenges, loading }: { challenges: AdminChallenge[]; loading: boolean }) => {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<Partial<AdminChallenge>>({});
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: Partial<AdminChallenge>) => {
+      if (editing) {
+        return api.put(`/api/admin/challenges/${editing}`, data);
+      }
+      return api.post('/api/admin/challenges', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "challenges"] });
+      setEditing(null); setCreating(false); setForm({});
+      toast.success(editing ? "Challenge updated" : "Challenge created");
+    },
+    onError: () => toast.error("Failed to save challenge"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/challenges/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "challenges"] });
+      toast.success("Challenge deleted");
+    },
+  });
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+
+  const isEditing = editing || creating;
+
+  return (
+    <div className="space-y-4">
+      {isEditing ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{creating ? "New Challenge" : "Edit Challenge"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Title</Label>
+              <Input value={form.title || ""} onChange={e => setForm({...form, title: e.target.value})} />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={form.description || ""} onChange={e => setForm({...form, description: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Type</Label>
+                <Select value={form.challenge_type || "distance"} onValueChange={v => {
+                  const units: Record<string, string> = { distance: 'meters', runs: 'runs', streak: 'days', single_run: 'meters', elevation: 'meters_elevation' };
+                  setForm({...form, challenge_type: v, target_unit: units[v] || 'meters'});
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="distance">Distance</SelectItem>
+                    <SelectItem value="runs">Run Count</SelectItem>
+                    <SelectItem value="streak">Streak</SelectItem>
+                    <SelectItem value="single_run">Single Run</SelectItem>
+                    <SelectItem value="elevation">Elevation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Target Value {form.challenge_type === 'distance' || form.challenge_type === 'single_run' ? '(meters)' : form.challenge_type === 'runs' ? '(count)' : form.challenge_type === 'streak' ? '(days)' : '(meters)'}</Label>
+                <Input type="number" value={form.target_value || ""} onChange={e => setForm({...form, target_value: Number(e.target.value)})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Start Date</Label>
+                <Input type="date" value={form.start_date?.slice(0, 10) || ""} onChange={e => setForm({...form, start_date: e.target.value})} />
+              </div>
+              <div>
+                <Label>End Date (optional)</Label>
+                <Input type="date" value={form.end_date?.slice(0, 10) || ""} onChange={e => setForm({...form, end_date: e.target.value || null})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Count From</Label>
+                <Select value={form.count_from || "challenge_start"} onValueChange={v => setForm({...form, count_from: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="challenge_start">Challenge Start</SelectItem>
+                    <SelectItem value="join_date">User Join Date</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch checked={!!form.is_published} onCheckedChange={c => setForm({...form, is_published: c})} id="challenge-published" />
+                  <Label htmlFor="challenge-published">Published</Label>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="flex-1">
+                <Save className="w-4 h-4 mr-2" />
+                {saveMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+              <Button variant="outline" onClick={() => { setEditing(null); setCreating(false); setForm({}); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Button onClick={() => { setCreating(true); setForm({ challenge_type: 'distance', target_unit: 'meters', count_from: 'challenge_start', is_published: false }); }} className="w-full">
+          <Plus className="w-4 h-4 mr-2" /> New Challenge
+        </Button>
+      )}
+
+      {challenges.map((ch: AdminChallenge) => (
+        <Card key={ch.id}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold truncate">{ch.title}</h3>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ch.is_published ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                    {ch.is_published ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {ch.challenge_type} · Target: {ch.target_value} {ch.target_unit} · {ch.participant_count || 0} participants
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="icon"
+                  onClick={() => { setEditing(ch.id); setCreating(false); setForm(ch); }}
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+                <DeleteConfirmDialog
+                  label="Challenge"
+                  onConfirm={() => deleteMutation.mutate(ch.id)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};

@@ -1,11 +1,11 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Calendar, Trophy, BarChart3, User } from "lucide-react";
+import { Home, Calendar, Trophy, BarChart3, User, Flame } from "lucide-react";
 import { useHaptics } from "@/hooks/useHaptics";
 import { motion } from "framer-motion";
 
 const navItems = [
   { path: "/home", icon: Home, label: "Home" },
-  { path: "/races", icon: Calendar, label: "Races" },
+  { path: "/challenges", icon: Flame, label: "Dare" },
   { path: "/leaderboard", icon: Trophy, label: "Ranks" },
   { path: "/stats", icon: BarChart3, label: "Stats" },
   { path: "/settings", icon: User, label: "Profile" },
