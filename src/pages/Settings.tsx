@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { isWeb } from "@/utils/platform";
+import MembershipCard from "@/components/MembershipCard";
 
 interface NotificationPreferences {
   achievements: boolean;
@@ -358,6 +359,25 @@ const Settings = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Membership Card */}
+        {profile?.member_id && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+              Membership Card
+            </h2>
+            <MembershipCard
+              displayName={profile.display_name || "Member"}
+              memberId={profile.member_id}
+              joinDate={profile.created_at}
+              avatarUrl={profile.avatar_url}
+            />
+          </motion.div>
+        )}
 
         {/* Appearance Section */}
         <motion.div

@@ -54,10 +54,22 @@ router.post('/signup', async (req: Request, res: Response) => {
             );
             const userId = userResult.rows[0].id;
 
+            // Generate unique 16-char member ID: ERC + 13 random alphanumeric (no ambiguous chars)
+            const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            const generateMemberId = () => {
+                let id = 'ERC';
+                const bytes = require('crypto').randomBytes(13);
+                for (let i = 0; i < 13; i++) {
+                    id += CHARSET[bytes[i] % CHARSET.length];
+                }
+                return id;
+            };
+            const memberId = generateMemberId();
+
             await client.query(
-                `INSERT INTO profiles (user_id, display_name)
-                 VALUES ($1, $2)`,
-                [userId, display_name.trim()]
+                `INSERT INTO profiles (user_id, display_name, member_id)
+                 VALUES ($1, $2, $3)`,
+                [userId, display_name.trim(), memberId]
             );
 
             await client.query(

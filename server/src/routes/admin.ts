@@ -174,5 +174,44 @@ router.delete('/users/:id', async (req: Request, res: Response) => {
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
+// ── MEMBER LOOKUP (QR scan at events) ──
+router.get('/lookup/:memberId', async (req: Request, res: Response) => {
+    try {
+        const { memberId } = req.params;
+        if (!memberId || memberId.length !== 16) {
+            return res.status(400).json({ error: 'Invalid member ID' });
+        }
+
+        const { rows } = await pool.query(
+            `SELECT p.user_id, p.display_name, p.avatar_url, p.member_id,
+                    p.total_distance, p.total_runs, p.current_streak, p.created_at,
+                    p.strava_id, u.email
+             FROM profiles p
+             JOIN users u ON u.id = p.user_id
+             WHERE p.member_id = $1`,
+            [String(memberId).toUpperCase()]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        const member = rows[0];
+        return res.json({
+            display_name: member.display_name,
+            avatar_url: member.avatar_url,
+            member_id: member.member_id,
+            email: member.email,
+            total_distance: member.total_distance,
+            total_runs: member.total_runs,
+            current_streak: member.current_streak,
+            strava_connected: !!member.strava_id,
+            joined: member.created_at,
+        });
+    } catch (err) {
+        console.error('[admin] Member lookup error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 export default router;

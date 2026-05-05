@@ -10,7 +10,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
         const { rows } = await pool.query(
             `SELECT user_id, strava_id, display_name, avatar_url, city,
                     total_distance, total_runs, current_streak, longest_streak,
-                    monthly_distance_goal, last_synced_at, created_at
+                    monthly_distance_goal, last_synced_at, created_at, member_id
              FROM profiles WHERE user_id = $1`,
             [req.user!.user_id]
         );
