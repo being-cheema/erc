@@ -5,6 +5,8 @@ import { api } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 import { Link as LinkIcon, LogOut, BarChart3, Trophy, Flame } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { isNativePlatform } from "@/utils/platform";
+import { Browser } from "@capacitor/browser";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg ref={ref} viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor" {...props}>
@@ -18,13 +20,39 @@ const ConnectStrava = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const pollNativeAuthResult = async (state: string) => {
+    const maxAttempts = 120;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const pollRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth/poll?state=${encodeURIComponent(state)}`
+      );
+      if (!pollRes.ok) {
+        continue;
+      }
+      const pollData = await pollRes.json();
+      if (!pollData.ready) {
+        continue;
+      }
+      if (pollData.token) {
+        api.setToken(pollData.token);
+      }
+      if (pollData.refresh_token) {
+        api.setRefreshToken(pollData.refresh_token);
+      }
+      await Browser.close().catch(() => undefined);
+      navigate("/home", { replace: true });
+      return true;
+    }
+    return false;
+  };
+
   const handleConnect = async () => {
     if (isLoading) return;
     setIsLoading(true);
     setError(null);
 
     try {
-      const redirectUri = `${window.location.origin}/auth/callback`;
       const token = api.getToken();
 
       if (!token) {
@@ -32,7 +60,13 @@ const ConnectStrava = () => {
         return;
       }
 
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const native = isNativePlatform();
+      const nativeState = native ? `${Date.now()}-${Math.random().toString(36).slice(2, 12)}` : "";
+      const redirectUri = native
+        ? `${import.meta.env.VITE_SUPABASE_URL}/auth/strava/callback`
+        : `${window.location.origin}/auth/callback`;
+
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}${nativeState ? `&state=${encodeURIComponent(nativeState)}` : ""}`;
 
       const response = await fetch(functionUrl, {
         headers: { Authorization: `Bearer ${token}` },
@@ -47,6 +81,15 @@ const ConnectStrava = () => {
       }
 
       if (data.url) {
+        if (native) {
+          await Browser.open({ url: data.url, presentationStyle: "fullscreen" });
+          const completed = await pollNativeAuthResult(nativeState);
+          if (!completed) {
+            setError("Strava auth timed out. Please try again.");
+            setIsLoading(false);
+          }
+          return;
+        }
         window.location.href = data.url;
       }
     } catch {

@@ -53,7 +53,7 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     preferredContentMode: 'mobile',
     scheme: 'eroderunners',
-    limitsNavigationsToAppBoundDomains: true,
+    limitsNavigationsToAppBoundDomains: false,
   },
   android: {
     backgroundColor: '#0a0a0a',
