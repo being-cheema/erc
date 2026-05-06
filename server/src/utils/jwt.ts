@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET: string = process.env.JWT_SECRET!;
 if (!JWT_SECRET) {
     throw new Error('FATAL: JWT_SECRET environment variable is not set');
 }
@@ -10,6 +10,7 @@ export interface JWTPayload {
     user_id: string;
     email: string;
     role: string;
+    member_id?: string;
 }
 
 export function signToken(payload: JWTPayload): string {

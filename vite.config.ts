@@ -33,4 +33,20 @@ export default defineConfig(({ mode }) => ({
       "@capacitor/status-bar",
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            const normalized = id.split("node_modules/")[1];
+            if (!normalized) return "vendor";
+            const parts = normalized.split("/");
+            const packageName = parts[0].startsWith("@") ? `${parts[0]}-${parts[1]}` : parts[0];
+            return `vendor-${packageName.replace("@", "").replace("/", "-")}`;
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 }));

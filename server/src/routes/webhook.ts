@@ -44,6 +44,17 @@ router.post('/', (req: Request, res: Response) => {
     // Respond immediately — Strava requires 200 within 2 seconds
     res.status(200).send('EVENT_RECEIVED');
 
+    if (
+        !event ||
+        typeof event.object_type !== 'string' ||
+        typeof event.aspect_type !== 'string' ||
+        typeof event.object_id !== 'number' ||
+        typeof event.owner_id !== 'number'
+    ) {
+        console.warn('[webhook] Ignoring malformed event payload');
+        return;
+    }
+
     // Deduplicate: skip if we already processed this exact event recently
     const dedupeKey = `${event.object_type}:${event.object_id}:${event.aspect_type}`;
     const lastSeen = recentEvents.get(dedupeKey);
@@ -111,7 +122,7 @@ async function processWebhookEvent(event: {
 
     // ── Activity created or updated — fetch it from Strava ──
     if (aspect_type === 'create' || aspect_type === 'update') {
-        let accessToken = decryptToken(profile.strava_access_token);
+        let accessToken: string | null = decryptToken(profile.strava_access_token);
         if (!accessToken) return;
 
         // Refresh token if expired

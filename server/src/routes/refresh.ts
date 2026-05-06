@@ -38,12 +38,15 @@ router.post('/', async (req: Request, res: Response) => {
         );
         const role = roleResult.rows[0]?.role || 'member';
 
-        // Get user's email
+        // Get user's email + member_id
         const userResult = await pool.query(`SELECT email FROM users WHERE id = $1`, [user_id]);
         const email = userResult.rows[0]?.email || '';
 
+        const profileResult = await pool.query(`SELECT member_id FROM profiles WHERE user_id = $1`, [user_id]);
+        const member_id = profileResult.rows[0]?.member_id || undefined;
+
         // Issue new JWT
-        const newToken = signToken({ user_id, email, role });
+        const newToken = signToken({ user_id, email, role, member_id });
 
         // Rotate refresh token — delete old, create new
         await pool.query(`DELETE FROM refresh_tokens WHERE token = $1`, [refresh_token]);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield, Link as LinkIcon, Unlink, Lock, Mail, Download, Smartphone, Apple } from "lucide-react";
+import { ArrowLeft, Moon, Sun, Bell, User, Loader2, Check, RefreshCw, LogOut, Medal, BookOpen, Shield, Link as LinkIcon, Unlink, Lock, Download, Smartphone, Apple, Compass } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { isWeb } from "@/utils/platform";
 import MembershipCard from "@/components/MembershipCard";
+const TUTORIAL_SEEN_KEY = "erc_tutorial_seen_v1";
 
 interface NotificationPreferences {
   achievements: boolean;
@@ -154,21 +155,24 @@ const Settings = () => {
 
     setIsSyncing(true);
     mediumImpact();
+    const syncToastId = toast.loading("Syncing your Strava activities...");
 
     try {
       const result = await api.post('/functions/v1/sync-strava', { force_full_sync: false });
 
       await queryClient.invalidateQueries({ queryKey: ["activities"] });
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
-      await queryClient.invalidateQueries({ queryKey: ["monthlyActivities"] });
-      await queryClient.invalidateQueries({ queryKey: ["monthlyDistance"] });
-      await queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
+      await queryClient.invalidateQueries({ queryKey: ["activities", "monthly"] });
+      await queryClient.invalidateQueries({ queryKey: ["monthly-stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["activities", "weekly"] });
 
       notificationSuccess();
       const syncedCount = result.results?.[0]?.activities || 0;
+      toast.dismiss(syncToastId);
       toast.success(`Synced ${syncedCount} activities`);
     } catch (error: any) {
       console.error("Force sync error:", error);
+      toast.dismiss(syncToastId);
       toast.error(error.message || "Failed to sync");
     } finally {
       setIsSyncing(false);
@@ -375,6 +379,7 @@ const Settings = () => {
               memberId={profile.member_id}
               joinDate={profile.created_at}
               avatarUrl={profile.avatar_url}
+              expandable
             />
           </motion.div>
         )}
@@ -636,6 +641,17 @@ const Settings = () => {
           </h2>
           <Card className="border-border/50">
             <CardContent className="p-0">
+              <button
+                onClick={() => {
+                  localStorage.removeItem(TUTORIAL_SEEN_KEY);
+                  lightImpact();
+                  navigate("/home?tutorial=1");
+                }}
+                className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors text-left"
+              >
+                <Compass className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">Show Tutorial Again</span>
+              </button>
               <button
                 onClick={() => { lightImpact(); navigate("/achievements"); }}
                 className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors text-left"

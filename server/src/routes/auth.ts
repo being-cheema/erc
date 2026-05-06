@@ -58,7 +58,7 @@ router.post('/signup', async (req: Request, res: Response) => {
             const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             const generateMemberId = () => {
                 let id = 'ERC';
-                const bytes = require('crypto').randomBytes(13);
+                const bytes = crypto.randomBytes(13);
                 for (let i = 0; i < 13; i++) {
                     id += CHARSET[bytes[i] % CHARSET.length];
                 }
@@ -80,7 +80,7 @@ router.post('/signup', async (req: Request, res: Response) => {
             await client.query('COMMIT');
 
             // Auto-login: generate tokens
-            const token = signToken({ user_id: userId, email: trimmedEmail, role: 'member' });
+            const token = signToken({ user_id: userId, email: trimmedEmail, role: 'member', member_id: memberId });
             const refreshToken = generateRefreshToken();
             const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
@@ -146,15 +146,21 @@ router.post('/login', async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Get user role
+        // Get user role + member_id
         const roleResult = await pool.query(
             'SELECT role FROM user_roles WHERE user_id = $1',
             [user.id]
         );
         const role = roleResult.rows[0]?.role || 'member';
 
+        const profileResult2 = await pool.query(
+            'SELECT member_id FROM profiles WHERE user_id = $1',
+            [user.id]
+        );
+        const memberId = profileResult2.rows[0]?.member_id || undefined;
+
         // Generate tokens
-        const token = signToken({ user_id: user.id, email: user.email, role });
+        const token = signToken({ user_id: user.id, email: user.email, role, member_id: memberId });
         const refreshToken = generateRefreshToken();
         const refreshExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 

@@ -16,8 +16,7 @@ export const usePullToRefresh = (onRefreshComplete?: () => void) => {
     try {
       // Just refresh data from our DB — the scheduler handles Strava syncing
       // This saves API budget (no Strava calls needed)
-      onRefreshComplete?.();
-      toast.success("Data refreshed!");
+      await Promise.resolve(onRefreshComplete?.());
       notificationSuccess();
     } catch (error: any) {
       console.error("Refresh error:", error);

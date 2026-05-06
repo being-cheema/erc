@@ -49,6 +49,7 @@ CREATE INDEX idx_refresh_tokens_user_id ON public.refresh_tokens(user_id);
 CREATE TABLE public.profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
+    member_id TEXT UNIQUE,
     strava_id TEXT UNIQUE,
     strava_access_token TEXT,
     strava_refresh_token TEXT,
@@ -255,10 +256,108 @@ CREATE TABLE public.notification_preferences (
 );
 
 -- ============================================================
+-- 11b. Challenges
+-- ============================================================
+CREATE TABLE public.challenges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    challenge_type TEXT NOT NULL,
+    target_value NUMERIC NOT NULL,
+    target_unit TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    count_from TEXT NOT NULL DEFAULT 'challenge_start',
+    is_published BOOLEAN DEFAULT false,
+    created_by UUID REFERENCES public.users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.challenge_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    challenge_id UUID REFERENCES public.challenges(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    current_progress NUMERIC DEFAULT 0,
+    is_completed BOOLEAN DEFAULT false,
+    completed_at TIMESTAMPTZ,
+    UNIQUE (challenge_id, user_id)
+);
+
+-- ============================================================
+-- 11c. Group runs
+-- ============================================================
+CREATE TABLE public.group_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    run_date TIMESTAMPTZ NOT NULL,
+    location TEXT NOT NULL,
+    meeting_point TEXT,
+    distance_km NUMERIC,
+    pace_group TEXT,
+    is_published BOOLEAN DEFAULT false,
+    created_by UUID REFERENCES public.users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.group_run_rsvps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_run_id UUID REFERENCES public.group_runs(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    status TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (group_run_id, user_id)
+);
+
+CREATE TABLE public.group_run_attendance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_run_id UUID REFERENCES public.group_runs(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    checked_in_by UUID REFERENCES public.users(id),
+    checked_in_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (group_run_id, user_id)
+);
+
+-- ============================================================
+-- 11d. Personal records
+-- ============================================================
+CREATE TABLE public.personal_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    distance_key TEXT NOT NULL,
+    distance_meters NUMERIC NOT NULL,
+    best_time_seconds INTEGER NOT NULL,
+    activity_id UUID REFERENCES public.activities(id) ON DELETE SET NULL,
+    achieved_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, distance_key)
+);
+
+-- ============================================================
+-- 11e. Race results log
+-- ============================================================
+CREATE TABLE public.race_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    race_name TEXT NOT NULL,
+    race_date DATE NOT NULL,
+    distance_km NUMERIC NOT NULL,
+    finish_time_seconds INTEGER NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- 12. Views
 -- ============================================================
 CREATE VIEW public.profiles_public AS
-SELECT id, user_id, display_name, avatar_url, city,
+SELECT id, user_id, display_name, avatar_url, city, member_id,
        total_distance, total_runs, current_streak,
        longest_streak, created_at, updated_at
 FROM profiles;
@@ -323,6 +422,11 @@ CREATE TRIGGER update_blog_posts_updated_at BEFORE UPDATE ON public.blog_posts F
 CREATE TRIGGER update_training_plans_updated_at BEFORE UPDATE ON public.training_plans FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 CREATE TRIGGER update_notification_prefs_updated_at BEFORE UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 CREATE TRIGGER update_leaderboard_updated_at BEFORE UPDATE ON public.monthly_leaderboard FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_challenges_updated_at BEFORE UPDATE ON public.challenges FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_group_runs_updated_at BEFORE UPDATE ON public.group_runs FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_group_run_rsvps_updated_at BEFORE UPDATE ON public.group_run_rsvps FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_personal_records_updated_at BEFORE UPDATE ON public.personal_records FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_race_results_updated_at BEFORE UPDATE ON public.race_results FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ============================================================
 -- 15. Seed data - Achievements

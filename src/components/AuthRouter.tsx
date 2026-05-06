@@ -3,8 +3,8 @@ import { Navigate, Outlet } from "react-router-dom";
 import { api } from "@/integrations/supabase/client";
 
 const AuthRouter = () => {
-  // Check auth synchronously — no useEffect, no state update loop
-  const isAuthenticated = !!api.getUser();
+  // Avoid false redirects while access token refresh is in-flight.
+  const isAuthenticated = api.isAuthenticated();
 
   // Subscribe to auth changes so we re-render on login/logout
   const [, forceUpdate] = useState(0);

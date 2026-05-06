@@ -3,8 +3,8 @@ import { api } from '@/integrations/supabase/client';
 
 export function useCurrentUser() {
   const rawUser = api.getUser();
-  // Map to compatible shape (user.id instead of user.user_id)
-  const user = rawUser ? { id: rawUser.user_id, email: rawUser.email, role: rawUser.role } : null;
+  // Keep both id and user_id for compatibility across existing hooks/pages.
+  const user = rawUser ? { id: rawUser.user_id, user_id: rawUser.user_id, email: rawUser.email, role: rawUser.role } : null;
   return { user, isAuthenticated: api.isAuthenticated() };
 }
 

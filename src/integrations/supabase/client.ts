@@ -35,18 +35,16 @@ class ApiClient {
   }
 
   // Parse JWT to get user info (without verification — that's server-side)
-  getUser(): { user_id: string; email: string; role: string } | null {
+  getUser(): { user_id: string; email: string; role: string; member_id?: string } | null {
     const token = this.getToken();
     if (!token) return null;
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      // Check expiry — try refresh if expired
       if (payload.exp && payload.exp * 1000 < Date.now()) {
-        // Don't clear immediately — let auto-refresh try first
         this.tryRefresh();
         return null;
       }
-      return { user_id: payload.user_id, email: payload.email, role: payload.role };
+      return { user_id: payload.user_id, email: payload.email, role: payload.role, member_id: payload.member_id };
     } catch {
       return null;
     }

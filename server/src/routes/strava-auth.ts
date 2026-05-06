@@ -200,15 +200,20 @@ router.get('/', async (req: Request, res: Response) => {
 
             console.log(`[strava-auth] Linked Strava athlete ${athlete.id} to user ${userId}`);
 
-            // Get user's role for JWT
+            // Get user's role + member_id for JWT
             const roleResult = await pool.query(
                 `SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role ASC LIMIT 1`,
                 [userId]
             );
             const role = roleResult.rows[0]?.role || 'member';
 
+            const memberResult = await pool.query(
+                `SELECT member_id FROM profiles WHERE user_id = $1`, [userId]
+            );
+            const member_id = memberResult.rows[0]?.member_id || undefined;
+
             // Generate fresh JWT with user's real email
-            const token = signToken({ user_id: userId, email: userEmail, role });
+            const token = signToken({ user_id: userId, email: userEmail, role, member_id });
 
             // Generate refresh token
             const refreshToken = generateRefreshToken();
@@ -412,10 +417,12 @@ router.get('/callback', async (req: Request, res: Response) => {
             }
         }
 
-        // Get role and generate JWT
+        // Get role + member_id and generate JWT
         const roleResult = await pool.query('SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role ASC LIMIT 1', [userId]);
         const role = roleResult.rows[0]?.role || 'member';
-        const token = signToken({ user_id: userId, email: `strava_${athlete.id}@eroderunners.local`, role });
+        const memberResult2 = await pool.query('SELECT member_id FROM profiles WHERE user_id = $1', [userId]);
+        const member_id2 = memberResult2.rows[0]?.member_id || undefined;
+        const token = signToken({ user_id: userId, email: `strava_${athlete.id}@eroderunners.local`, role, member_id: member_id2 });
 
         // Generate refresh token
         const refreshToken = generateRefreshToken();

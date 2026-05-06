@@ -1,6 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/integrations/supabase/client";
 
+export interface LeaderboardEntry {
+  id?: string;
+  user_id: string;
+  member_id?: string;
+  display_name: string;
+  avatar_url: string | null;
+  city?: string;
+  total_distance: number;
+  total_runs?: number;
+  rank?: number;
+  rank_change?: number | null;
+}
+
 export function useLeaderboard(period: string = 'monthly') {
   return useQuery({
     queryKey: ['leaderboard', period],

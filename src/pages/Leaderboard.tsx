@@ -8,8 +8,10 @@ import { useCurrentUser } from "@/hooks/useProfile";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefresh from "@/components/PullToRefresh";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 const Leaderboard = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyLeaderboard();
   const { data: allTimeData, isLoading: allTimeLoading } = useAllTimeLeaderboard();
@@ -145,7 +147,10 @@ const Leaderboard = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
               >
-                <Card className={`glass-card border-white/[0.08] ${isCurrentUser ? "border-primary/30 bg-primary/[0.08] shadow-[0_0_20px_hsl(var(--primary)/0.1)]" : ""}`}>
+                <Card
+                  className={`glass-card border-white/[0.08] ${isCurrentUser ? "border-primary/30 bg-primary/[0.08] shadow-[0_0_20px_hsl(var(--primary)/0.1)]" : ""} ${runner.member_id ? "cursor-pointer active:scale-[0.98] transition-transform" : ""}`}
+                  onClick={() => runner.member_id && navigate(`/m/${runner.member_id}`)}
+                >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black

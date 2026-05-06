@@ -11,8 +11,8 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         const query = isAdmin
             ? 'SELECT * FROM races ORDER BY race_date ASC'
             : 'SELECT * FROM races WHERE is_published = true ORDER BY race_date ASC';
-
         const { rows } = await pool.query(query);
+        const authUserId = req.user?.user_id || null;
 
         // Get participant counts
         for (const race of rows) {
@@ -21,6 +21,15 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
                 [race.id]
             );
             race.participant_count = parseInt(countResult.rows[0].count);
+            if (authUserId) {
+                const registrationResult = await pool.query(
+                    'SELECT 1 FROM race_participants WHERE race_id = $1 AND user_id = $2 LIMIT 1',
+                    [race.id, authUserId]
+                );
+                race.is_registered = registrationResult.rows.length > 0;
+            } else {
+                race.is_registered = false;
+            }
         }
 
         return res.json(rows);

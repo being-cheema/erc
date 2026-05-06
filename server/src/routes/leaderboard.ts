@@ -23,7 +23,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
 
         // Monthly leaderboard with profile info
         const { rows } = await pool.query(
-            `SELECT ml.*, pp.display_name, pp.avatar_url, pp.city
+            `SELECT ml.*, pp.display_name, pp.avatar_url, pp.city, pp.member_id
        FROM monthly_leaderboard ml
        JOIN profiles_public pp ON pp.user_id = ml.user_id
        WHERE ml.year = $1 AND ml.month = $2

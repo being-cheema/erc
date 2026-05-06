@@ -23,7 +23,7 @@ import { isWeb } from "@/utils/platform";
 
 // Smart root redirect — platform-aware
 const RootRedirect = () => {
-  const isAuthenticated = !!api.getUser();
+  const isAuthenticated = api.isAuthenticated();
   if (isAuthenticated) return <Navigate to="/home" replace />;
   return <Navigate to={isWeb() ? "/landing" : "/login"} replace />;
 };
@@ -42,6 +42,11 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
+const MemberProfile = lazy(() => import("./pages/MemberProfile"));
+const GroupRuns = lazy(() => import("./pages/GroupRuns"));
+const GroupRunDetail = lazy(() => import("./pages/GroupRunDetail"));
+const PersonalRecords = lazy(() => import("./pages/PersonalRecords"));
+const RaceResults = lazy(() => import("./pages/RaceResults"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Minimal loading spinner for lazy routes
@@ -68,6 +73,7 @@ const AppContent = () => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<StravaCallback />} />
+        <Route path="/m/:memberId" element={<MemberProfile />} />
 
         {/* Protected routes — require authentication */}
         <Route element={<AuthRouter />}>
@@ -84,13 +90,17 @@ const AppContent = () => {
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/challenges" element={<Challenges />} />
             <Route path="/challenges/:id" element={<ChallengeDetail />} />
+            <Route path="/group-runs" element={<GroupRuns />} />
+            <Route path="/group-runs/:id" element={<GroupRunDetail />} />
+            <Route path="/personal-records" element={<PersonalRecords />} />
+            <Route path="/race-results" element={<RaceResults />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
 
-        {/* Fallback for unknown routes — redirect to root */}
-        <Route path="*" element={<RootRedirect />} />
+        {/* Fallback for unknown routes */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

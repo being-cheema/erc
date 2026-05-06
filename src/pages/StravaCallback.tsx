@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Activity, CheckCircle2, TrendingUp, Trophy, XCircle, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type SyncStep = "auth" | "syncing" | "calculating" | "achievements" | "complete" | "error";
 
@@ -24,6 +25,7 @@ const StravaCallback = () => {
     message: "Connecting to Strava...",
   });
   const [canRetry, setCanRetry] = useState(false);
+  const syncToastId = useRef<string | number | undefined>(undefined);
   const processedCode = useRef<string | null>(null);
   const isProcessing = useRef(false);
 
@@ -103,6 +105,7 @@ const StravaCallback = () => {
 
       // Trigger Strava sync
       setSyncState({ step: "syncing", message: `Syncing your activities, ${athleteName}...`, progress: 30 });
+      syncToastId.current = toast.loading("Syncing your Strava activities...");
 
       try {
         await fetch(
@@ -124,6 +127,7 @@ const StravaCallback = () => {
 
       let attempts = 0;
       const maxAttempts = 120; // 2 minutes max
+      let importedActivities: number | null = null;
 
       const pollSync = async (): Promise<void> => {
         while (attempts < maxAttempts) {
@@ -138,6 +142,15 @@ const StravaCallback = () => {
             const statusData = await statusRes.json();
 
             if (statusData.status === "done") {
+              const importedCount =
+                statusData.activities_synced ??
+                statusData.activities_imported ??
+                statusData.total_activities ??
+                statusData.count;
+              if (typeof importedCount === "number") {
+                importedActivities = importedCount;
+                setSyncState((prev) => ({ ...prev, activitiesFound: importedCount }));
+              }
               setSyncState({ step: "calculating", message: "Calculating your stats...", progress: 80 });
               await new Promise(resolve => setTimeout(resolve, 1000));
               setSyncState({ step: "achievements", message: "Checking achievements...", progress: 90 });
@@ -170,12 +183,20 @@ const StravaCallback = () => {
         message: `Welcome, ${athleteName}! Your data is ready.`,
         progress: 100,
       });
+      toast.dismiss(syncToastId.current);
+      if (typeof importedActivities === "number" && importedActivities > 0) {
+        toast.success(`Synced ${importedActivities} activities!`);
+      } else {
+        toast.success("Strava connected and sync completed.");
+      }
+      sessionStorage.setItem("strava_sync_complete", "1");
 
       await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/home");
     } catch (err) {
       console.error("Callback error:", err);
       isProcessing.current = false;
+      toast.dismiss(syncToastId.current);
       setSyncState({
         step: "error",
         message: "Connection failed",

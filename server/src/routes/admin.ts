@@ -175,6 +175,59 @@ router.delete('/challenges/:id', async (req: Request, res: Response) => {
     }
 });
 
+// ── GROUP RUNS CRUD ──
+router.post('/group-runs', async (req: Request, res: Response) => {
+    try {
+        const { title, description, location, meeting_point, run_date, distance_km, pace_group, max_participants, is_published } = req.body;
+        const { rows } = await pool.query(
+            `INSERT INTO group_runs (title, description, location, meeting_point, run_date, distance_km, pace_group, max_participants, is_published, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+            [title, description, location, meeting_point, run_date, distance_km || null, pace_group || null, max_participants || null, is_published || false, req.user!.user_id]
+        );
+        return res.status(201).json(rows[0]);
+    } catch (err) {
+        console.error('[admin] Create group run error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/group-runs', async (_req: Request, res: Response) => {
+    try {
+        const { rows } = await pool.query(
+            `SELECT gr.*,
+                    (SELECT COUNT(*) FROM group_run_rsvps r WHERE r.group_run_id = gr.id AND r.status = 'going') as going_count,
+                    (SELECT COUNT(*) FROM group_run_attendance a WHERE a.group_run_id = gr.id) as attended_count
+             FROM group_runs gr ORDER BY gr.run_date DESC`
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/group-runs/:id', async (req: Request, res: Response) => {
+    try {
+        const { title, description, location, meeting_point, run_date, distance_km, pace_group, max_participants, is_published } = req.body;
+        const { rows } = await pool.query(
+            `UPDATE group_runs SET title=$1, description=$2, location=$3, meeting_point=$4, run_date=$5, distance_km=$6, pace_group=$7, max_participants=$8, is_published=$9
+             WHERE id=$10 RETURNING *`,
+            [title, description, location, meeting_point, run_date, distance_km, pace_group, max_participants, is_published, req.params.id]
+        );
+        return res.json(rows[0]);
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.delete('/group-runs/:id', async (req: Request, res: Response) => {
+    try {
+        await pool.query('DELETE FROM group_runs WHERE id = $1', [req.params.id]);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ── USER ROLE MANAGEMENT ──
 router.get('/users', async (_req: Request, res: Response) => {
     try {

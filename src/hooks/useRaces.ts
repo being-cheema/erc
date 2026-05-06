@@ -15,6 +15,7 @@ export interface Race {
   created_at: string;
   updated_at: string;
   participant_count?: number;
+  is_registered?: boolean;
 }
 
 export function useRaces() {

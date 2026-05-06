@@ -68,7 +68,7 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
             return { userId: profile.user_id, success: false, error: 'Rate limit budget exhausted' };
         }
 
-        let accessToken = decryptToken(profile.strava_access_token);
+        let accessToken: string | null = decryptToken(profile.strava_access_token);
         if (!accessToken) return { userId: profile.user_id, success: false, error: 'No access token' };
 
         // Refresh expired token

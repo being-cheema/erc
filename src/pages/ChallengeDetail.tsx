@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { ArrowLeft, Users, Clock, Trophy, Loader2, Check, Target, Flame, Mountain, Footprints, TrendingUp, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useChallengeDetail, useJoinChallenge, useLeaveChallenge } from "@/hooks/useChallenges";
 import { useCurrentUser } from "@/hooks/useProfile";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { format, differenceInDays, isPast, isFuture } from "date-fns";
 
@@ -39,15 +40,28 @@ const formatProgressValue = (value: number, type: string) => {
 const ChallengeDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: challenge, isLoading } = useChallengeDetail(id || "");
+  const { data: challenge, isLoading, isError } = useChallengeDetail(id || "");
   const { user } = useCurrentUser();
   const joinMutation = useJoinChallenge();
   const leaveMutation = useLeaveChallenge();
+  const [showJoinGuidance, setShowJoinGuidance] = useState(false);
 
-  if (isLoading || !challenge) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !challenge) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="text-center space-y-3">
+          <p className="text-base font-semibold text-foreground">Could not load this challenge</p>
+          <p className="text-sm text-muted-foreground">Please try again in a moment.</p>
+          <Button onClick={() => navigate("/challenges")}>Back to Challenges</Button>
+        </div>
       </div>
     );
   }
@@ -69,6 +83,7 @@ const ChallengeDetail = () => {
     try {
       await joinMutation.mutateAsync(challenge.id);
       toast.success("You joined the challenge!");
+      setShowJoinGuidance(true);
     } catch {
       toast.error("Failed to join challenge");
     }
@@ -78,6 +93,7 @@ const ChallengeDetail = () => {
     try {
       await leaveMutation.mutateAsync(challenge.id);
       toast.success("Left the challenge");
+      setShowJoinGuidance(false);
     } catch {
       toast.error("Failed to leave challenge");
     }
@@ -183,6 +199,11 @@ const ChallengeDetail = () => {
                 <p className="text-xs text-muted-foreground mt-2 font-medium">
                   {progressPct.toFixed(0)}% complete
                 </p>
+                {showJoinGuidance && progress <= 0 && (
+                  <p className="text-xs text-primary mt-2 font-medium">
+                    Your progress syncs automatically from Strava. Go run!
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -257,7 +278,11 @@ const ChallengeDetail = () => {
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <p className="font-bold text-foreground text-sm truncate">
-                              {entry.display_name}
+                              {entry.member_id ? (
+                                <Link to={`/m/${entry.member_id}`} className="hover:text-primary transition-colors">
+                                  {entry.display_name}
+                                </Link>
+                              ) : entry.display_name}
                               {isMe && <span className="text-primary ml-1">(you)</span>}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">

@@ -4,6 +4,7 @@ import { verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import { recordCalls, canMakeCalls, updateFromHeaders, getUsageStats } from '../rate-limiter.js';
 import { recalculateAllChallenges } from './challenges.js';
+import { scanUserPRs } from './personal-records.js';
 
 const router = Router();
 
@@ -291,7 +292,21 @@ setInterval(() => {
 
 // ── Sync status endpoint ──
 router.get('/status/:userId', (req: Request, res: Response) => {
-    const status = syncStatusMap.get(req.params.userId);
+    const userIdParam = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authorization required' });
+    }
+    try {
+        const payload = verifyToken(authHeader.replace('Bearer ', ''));
+        const isAdmin = payload.role === 'admin';
+        if (!isAdmin && payload.user_id !== userIdParam) {
+            return res.status(403).json({ error: 'forbidden' });
+        }
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    const status = syncStatusMap.get(userIdParam);
     if (!status) return res.json({ status: 'idle' });
     return res.json(status);
 });
@@ -301,7 +316,7 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
     for (const profile of profiles) {
         syncStatusMap.set(profile.user_id, { status: 'running', startedAt: Date.now() });
         try {
-            let accessToken = decryptToken(profile.strava_access_token);
+            let accessToken: string | null = decryptToken(profile.strava_access_token);
             if (!accessToken) {
                 syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: 'No access token' });
                 continue;
@@ -475,8 +490,9 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
                 totalDistance, totalRuns: totalRunsCount, currentStreak, longestStreak,
             });
 
-            // Recalculate challenge progress
+            // Recalculate challenge progress + personal records
             await recalculateAllChallenges(profile.user_id);
+            await scanUserPRs(profile.user_id);
 
             syncStatusMap.set(profile.user_id, {
                 status: 'done',
@@ -529,6 +545,10 @@ router.all('/', async (req: Request, res: Response) => {
         // Security: only admins can sync other users
         if (targetUserId && authenticatedUserId && targetUserId !== authenticatedUserId && !isAdmin) {
             return res.status(403).json({ success: false, error: 'forbidden' });
+        }
+
+        if (!authenticatedUserId) {
+            return res.status(401).json({ success: false, error: 'Authorization required' });
         }
 
         const userId = targetUserId || authenticatedUserId;

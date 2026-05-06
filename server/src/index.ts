@@ -21,6 +21,12 @@ import webhookRouter from './routes/webhook.js';
 import refreshRouter from './routes/refresh.js';
 import authRouter from './routes/auth.js';
 import challengesRouter from './routes/challenges.js';
+import membersRouter from './routes/members.js';
+import groupRunsRouter from './routes/group-runs.js';
+import personalRecordsRouter from './routes/personal-records.js';
+import clubFeedRouter from './routes/club-feed.js';
+import raceResultsRouter from './routes/race-results.js';
+import streakCalendarRouter from './routes/streak-calendar.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -78,6 +84,12 @@ app.use('/api/training', trainingRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/challenges', challengesRouter);
+app.use('/api/members', membersRouter);
+app.use('/api/group-runs', groupRunsRouter);
+app.use('/api/personal-records', personalRecordsRouter);
+app.use('/api/feed', clubFeedRouter);
+app.use('/api/race-results', raceResultsRouter);
+app.use('/api/streak-calendar', streakCalendarRouter);
 
 // Strava webhook — outside /functions/ namespace, Strava hits this directly
 app.use('/webhook', webhookRouter);

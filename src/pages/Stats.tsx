@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Loader2, Activity, CheckCircle } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import StatsTabs from "@/components/stats/StatsTabs";
+import StreakCalendar from "@/components/stats/StreakCalendar";
 import { Card, CardContent } from "@/components/ui/card";
 
 const Stats = () => {
@@ -28,6 +29,9 @@ const Stats = () => {
       </motion.header>
 
       <div className="px-4 space-y-4">
+        {/* Run Streak Calendar */}
+        <StreakCalendar />
+
         {/* Stats Tabs with Charts */}
         <StatsTabs />
 

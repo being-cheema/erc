@@ -57,7 +57,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
         // Leaderboard (top 50)
         const { rows: leaderboard } = await pool.query(
             `SELECT cp.current_progress, cp.is_completed, cp.completed_at, cp.joined_at,
-                    p.display_name, p.avatar_url, p.user_id
+                    p.display_name, p.avatar_url, p.user_id, p.member_id
              FROM challenge_participants cp
              JOIN profiles p ON p.user_id = cp.user_id
              WHERE cp.challenge_id = $1
@@ -162,12 +162,11 @@ export async function calculateUserChallengeProgress(userId: string, challengeId
         case 'distance': {
             const { rows } = await pool.query(
                 `SELECT COALESCE(SUM(distance), 0) as total
-                 FROM activities a
-                 JOIN profiles p ON p.strava_id = a.strava_athlete_id::text
-                 WHERE p.user_id = $1
-                   AND a.start_date >= $2
-                   AND a.start_date <= $3
-                   AND a.type IN ('Run', 'TrailRun', 'VirtualRun')`,
+                 FROM activities
+                 WHERE user_id = $1
+                   AND start_date >= $2
+                   AND start_date <= $3
+                   AND activity_type IN ('Run', 'TrailRun', 'VirtualRun')`,
                 [userId, startDate, endDate]
             );
             progress = Number(rows[0].total);
@@ -176,12 +175,11 @@ export async function calculateUserChallengeProgress(userId: string, challengeId
         case 'runs': {
             const { rows } = await pool.query(
                 `SELECT COUNT(*) as total
-                 FROM activities a
-                 JOIN profiles p ON p.strava_id = a.strava_athlete_id::text
-                 WHERE p.user_id = $1
-                   AND a.start_date >= $2
-                   AND a.start_date <= $3
-                   AND a.type IN ('Run', 'TrailRun', 'VirtualRun')`,
+                 FROM activities
+                 WHERE user_id = $1
+                   AND start_date >= $2
+                   AND start_date <= $3
+                   AND activity_type IN ('Run', 'TrailRun', 'VirtualRun')`,
                 [userId, startDate, endDate]
             );
             progress = Number(rows[0].total);
@@ -190,12 +188,11 @@ export async function calculateUserChallengeProgress(userId: string, challengeId
         case 'single_run': {
             const { rows } = await pool.query(
                 `SELECT COALESCE(MAX(distance), 0) as max_dist
-                 FROM activities a
-                 JOIN profiles p ON p.strava_id = a.strava_athlete_id::text
-                 WHERE p.user_id = $1
-                   AND a.start_date >= $2
-                   AND a.start_date <= $3
-                   AND a.type IN ('Run', 'TrailRun', 'VirtualRun')`,
+                 FROM activities
+                 WHERE user_id = $1
+                   AND start_date >= $2
+                   AND start_date <= $3
+                   AND activity_type IN ('Run', 'TrailRun', 'VirtualRun')`,
                 [userId, startDate, endDate]
             );
             progress = Number(rows[0].max_dist);
@@ -203,13 +200,12 @@ export async function calculateUserChallengeProgress(userId: string, challengeId
         }
         case 'elevation': {
             const { rows } = await pool.query(
-                `SELECT COALESCE(SUM(total_elevation_gain), 0) as total
-                 FROM activities a
-                 JOIN profiles p ON p.strava_id = a.strava_athlete_id::text
-                 WHERE p.user_id = $1
-                   AND a.start_date >= $2
-                   AND a.start_date <= $3
-                   AND a.type IN ('Run', 'TrailRun', 'VirtualRun')`,
+                `SELECT COALESCE(SUM(elevation_gain), 0) as total
+                 FROM activities
+                 WHERE user_id = $1
+                   AND start_date >= $2
+                   AND start_date <= $3
+                   AND activity_type IN ('Run', 'TrailRun', 'VirtualRun')`,
                 [userId, startDate, endDate]
             );
             progress = Number(rows[0].total);
@@ -217,13 +213,12 @@ export async function calculateUserChallengeProgress(userId: string, challengeId
         }
         case 'streak': {
             const { rows } = await pool.query(
-                `SELECT DISTINCT DATE(a.start_date) as run_date
-                 FROM activities a
-                 JOIN profiles p ON p.strava_id = a.strava_athlete_id::text
-                 WHERE p.user_id = $1
-                   AND a.start_date >= $2
-                   AND a.start_date <= $3
-                   AND a.type IN ('Run', 'TrailRun', 'VirtualRun')
+                `SELECT DISTINCT DATE(start_date) as run_date
+                 FROM activities
+                 WHERE user_id = $1
+                   AND start_date >= $2
+                   AND start_date <= $3
+                   AND activity_type IN ('Run', 'TrailRun', 'VirtualRun')
                  ORDER BY run_date`,
                 [userId, startDate, endDate]
             );

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Trophy, BookOpen, Target, Plus, Trash2, Edit2, Save, X,
-  ArrowLeft, Loader2, Calendar, AlertTriangle, Flame
+  ArrowLeft, Loader2, Calendar, AlertTriangle, Flame, Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,12 @@ const Admin = () => {
     enabled: isAdmin === true,
   });
 
+  const { data: groupRunsList, isLoading: groupRunsLoading } = useQuery({
+    queryKey: ["admin", "group-runs"],
+    queryFn: () => api.get('/api/admin/group-runs'),
+    enabled: isAdmin === true,
+  });
+
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -147,7 +153,7 @@ const Admin = () => {
 
       <div className="px-4 py-6">
         <Tabs defaultValue="races" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="races" className="gap-1 text-xs">
               <Trophy className="w-3.5 h-3.5" />
               Races
@@ -155,6 +161,10 @@ const Admin = () => {
             <TabsTrigger value="challenges" className="gap-1 text-xs">
               <Flame className="w-3.5 h-3.5" />
               Dares
+            </TabsTrigger>
+            <TabsTrigger value="group-runs" className="gap-1 text-xs">
+              <Users className="w-3.5 h-3.5" />
+              Runs
             </TabsTrigger>
             <TabsTrigger value="blog" className="gap-1 text-xs">
               <BookOpen className="w-3.5 h-3.5" />
@@ -172,6 +182,10 @@ const Admin = () => {
 
           <TabsContent value="challenges">
             <ChallengesAdmin challenges={challengesList || []} loading={challengesLoading} />
+          </TabsContent>
+
+          <TabsContent value="group-runs">
+            <GroupRunsAdmin runs={groupRunsList || []} loading={groupRunsLoading} />
           </TabsContent>
 
           <TabsContent value="blog">
@@ -775,6 +789,115 @@ const ChallengesAdmin = ({ challenges, loading }: { challenges: AdminChallenge[]
                   label="Challenge"
                   onConfirm={() => deleteMutation.mutate(ch.id)}
                 />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+// ─── Group Runs Admin ─────────────────────────────────
+const GroupRunsAdmin = ({ runs, loading }: { runs: any[]; loading: boolean }) => {
+  const queryClient = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<any>({});
+
+  const saveMutation = useMutation({
+    mutationFn: (data: any) =>
+      editing
+        ? api.put(`/api/admin/group-runs/${editing}`, data)
+        : api.post('/api/admin/group-runs', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "group-runs"] });
+      setCreating(false); setEditing(null); setForm({});
+      toast.success(editing ? "Group run updated" : "Group run created");
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/group-runs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "group-runs"] });
+      toast.success("Group run deleted");
+    },
+  });
+
+  const handleSave = () => {
+    if (!form.title || !form.location || !form.run_date) {
+      toast.error("Title, location, and date are required");
+      return;
+    }
+    saveMutation.mutate(form);
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold">Group Runs ({runs.length})</h3>
+        <Button size="sm" onClick={() => { setCreating(true); setEditing(null); setForm({ is_published: true }); }}>
+          <Plus className="w-4 h-4 mr-1" /> Add Run
+        </Button>
+      </div>
+
+      {(creating || editing) && (
+        <Card className="border-primary/30">
+          <CardContent className="p-4 space-y-3">
+            <Input placeholder="Title" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+            <Textarea placeholder="Description" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input placeholder="Location" value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} />
+              <Input placeholder="Meeting point" value={form.meeting_point || ''} onChange={e => setForm({ ...form, meeting_point: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input type="datetime-local" value={form.run_date?.slice(0, 16) || ''} onChange={e => setForm({ ...form, run_date: e.target.value })} />
+              <Input type="number" placeholder="Distance (km)" value={form.distance_km || ''} onChange={e => setForm({ ...form, distance_km: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input placeholder="Pace group (e.g. 6:00/km)" value={form.pace_group || ''} onChange={e => setForm({ ...form, pace_group: e.target.value })} />
+              <Input type="number" placeholder="Max participants" value={form.max_participants || ''} onChange={e => setForm({ ...form, max_participants: e.target.value })} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.is_published || false} onCheckedChange={(v: boolean) => setForm({ ...form, is_published: v })} />
+              <Label>Published</Label>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSave} disabled={saveMutation.isPending} className="gap-1">
+                <Save className="w-4 h-4" /> {editing ? 'Update' : 'Create'}
+              </Button>
+              <Button variant="ghost" onClick={() => { setCreating(false); setEditing(null); setForm({}); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {runs.map((run: any) => (
+        <Card key={run.id} className="border-border">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-foreground truncate">{run.title}</h4>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${run.is_published ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-muted-foreground'}`}>
+                    {run.is_published ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {run.location} · {new Date(run.run_date).toLocaleDateString()} · {run.going_count || 0} going · {run.attended_count || 0} attended
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="icon" onClick={() => { setEditing(run.id); setCreating(false); setForm(run); }}>
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+                <DeleteConfirmDialog label="Group run" onConfirm={() => deleteMutation.mutate(run.id)} />
               </div>
             </div>
           </CardContent>
