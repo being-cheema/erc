@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import logo from "@/assets/logo.png";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { APP_URL } from "@/config";
 
 interface MembershipCardProps {
   displayName: string;
@@ -35,7 +36,7 @@ const MembershipCard = ({
 
   useEffect(() => {
     if (memberId) {
-      const profileUrl = `https://eroderunnersclub.com/m/${memberId}`;
+      const profileUrl = `${APP_URL}/m/${memberId}`;
       QRCode.toDataURL(profileUrl, {
         width: large ? 220 : 120,
         margin: 1,

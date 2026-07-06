@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { generalLimiter, authLimiter } from './middleware/api-rate-limit.js';
 import pool from './db.js';
+import { assertProductionSecrets } from './utils/boot-checks.js';
+
+assertProductionSecrets();
 
 // Routes
 import stravaAuthRouter from './routes/strava-auth.js';
@@ -27,6 +30,7 @@ import personalRecordsRouter from './routes/personal-records.js';
 import clubFeedRouter from './routes/club-feed.js';
 import raceResultsRouter from './routes/race-results.js';
 import streakCalendarRouter from './routes/streak-calendar.js';
+import statsRouter from './routes/stats.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -37,6 +41,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
     origin: [
         'https://api.eroderunnersclub.com',
+        'https://app.eroderunnersclub.com',
         'https://eroderunnersclub.com',
         'http://localhost:5173',
         'http://localhost:3000',
@@ -90,9 +95,13 @@ app.use('/api/personal-records', personalRecordsRouter);
 app.use('/api/feed', clubFeedRouter);
 app.use('/api/race-results', raceResultsRouter);
 app.use('/api/streak-calendar', streakCalendarRouter);
+app.use('/api/stats', statsRouter);
 
-// Strava webhook — outside /functions/ namespace, Strava hits this directly
-app.use('/webhook', webhookRouter);
+// Strava webhook — secret path only; legacy /webhook returns 404
+app.use('/webhook/:secret', webhookRouter);
+app.all('/webhook', (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+});
 
 // 404 fallback
 app.use((_req, res) => {
@@ -102,7 +111,7 @@ app.use((_req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`[api] Erode Runners API running on port ${PORT}`);
 
-    // Start scheduled Strava sync (every 6h by default)
+    // Start scheduled Strava sync (every 24h — safety net for missed webhooks)
     import('./scheduler.js').then(({ startScheduledSync }) => {
         startScheduledSync();
     }).catch(err => {

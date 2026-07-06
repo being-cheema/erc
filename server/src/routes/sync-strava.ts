@@ -3,8 +3,8 @@ import pool from '../db.js';
 import { verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import { recordCalls, canMakeCalls, updateFromHeaders, getUsageStats } from '../rate-limiter.js';
-import { recalculateAllChallenges } from './challenges.js';
-import { scanUserPRs } from './personal-records.js';
+import { runPostSyncPipeline } from '../services/post-sync.js';
+import { isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -184,95 +184,6 @@ async function fetchRecentActivityDetails(accessToken: string, activities: Strav
     return detailsMap;
 }
 
-// ── Calculate streaks ──
-function calculateStreaks(runDates: Date[]): { currentStreak: number; longestStreak: number } {
-    if (runDates.length === 0) return { currentStreak: 0, longestStreak: 0 };
-
-    const uniqueDates = [...new Set(runDates.map(d => {
-        const date = new Date(d);
-        date.setHours(0, 0, 0, 0);
-        return date.getTime();
-    }))].sort((a, b) => b - a);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
-    const oneDayMs = 24 * 60 * 60 * 1000;
-
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
-
-    for (let i = 0; i < uniqueDates.length; i++) {
-        const dateTime = uniqueDates[i];
-
-        if (i === 0) {
-            const daysDiff = Math.floor((todayTime - dateTime) / oneDayMs);
-            if (daysDiff <= 1) {
-                tempStreak = 1;
-                currentStreak = 1;
-            } else {
-                tempStreak = 1;
-            }
-        } else {
-            const prevDateTime = uniqueDates[i - 1];
-            const daysDiff = Math.floor((prevDateTime - dateTime) / oneDayMs);
-            if (daysDiff === 1) {
-                tempStreak++;
-                if (currentStreak > 0) currentStreak = tempStreak;
-            } else {
-                tempStreak = 1;
-            }
-        }
-        longestStreak = Math.max(longestStreak, tempStreak);
-    }
-
-    return { currentStreak, longestStreak };
-}
-
-// ── Check and unlock achievements ──
-async function checkAndUnlockAchievements(userId: string, stats: { totalDistance: number; totalRuns: number; currentStreak: number; longestStreak: number }): Promise<string[]> {
-    try {
-        const { rows: achievements } = await pool.query('SELECT * FROM achievements');
-        if (!achievements.length) return [];
-
-        const { rows: existingAchievements } = await pool.query(
-            'SELECT achievement_id FROM user_achievements WHERE user_id = $1', [userId]
-        );
-        const existingIds = new Set(existingAchievements.map(a => a.achievement_id));
-
-        const unlocked: string[] = [];
-
-        for (const ach of achievements) {
-            if (existingIds.has(ach.id)) continue;
-
-            let qualified = false;
-            switch (ach.requirement_type) {
-                case 'total_distance': qualified = stats.totalDistance >= ach.requirement_value; break;
-                case 'total_runs':
-                case 'runs_count': qualified = stats.totalRuns >= ach.requirement_value; break;
-                case 'current_streak':
-                case 'streak_days': qualified = stats.currentStreak >= ach.requirement_value; break;
-                case 'longest_streak': qualified = stats.longestStreak >= ach.requirement_value; break;
-            }
-
-            if (qualified) {
-                const { error } = await pool.query(
-                    'INSERT INTO user_achievements (user_id, achievement_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                    [userId, ach.id]
-                ).then(r => ({ error: null })).catch(e => ({ error: e }));
-
-                if (!error) unlocked.push(ach.name);
-            }
-        }
-
-        return unlocked;
-    } catch (err) {
-        console.error('Achievement check error:', err);
-        return [];
-    }
-}
-
 // ── In-memory sync status tracker ──
 interface SyncStatus {
     status: 'running' | 'done' | 'error';
@@ -291,20 +202,20 @@ setInterval(() => {
 }, 60_000);
 
 // ── Sync status endpoint ──
-router.get('/status/:userId', (req: Request, res: Response) => {
+router.get('/status/:userId', async (req: Request, res: Response) => {
     const userIdParam = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authorization required' });
     }
+    let payload;
     try {
-        const payload = verifyToken(authHeader.replace('Bearer ', ''));
-        const isAdmin = payload.role === 'admin';
-        if (!isAdmin && payload.user_id !== userIdParam) {
-            return res.status(403).json({ error: 'forbidden' });
-        }
+        payload = verifyToken(authHeader.replace('Bearer ', ''));
     } catch {
         return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    if (payload.user_id !== userIdParam && !(await isAdminInDb(payload.user_id))) {
+        return res.status(403).json({ error: 'forbidden' });
     }
     const status = syncStatusMap.get(userIdParam);
     if (!status) return res.json({ status: 'idle' });
@@ -339,19 +250,11 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
             // Determine sync mode
             const needsFullSync = forceFullSync || !profile.total_runs || !profile.total_distance;
 
-            let allRuns: StravaActivity[];
-            let monthlyRuns: StravaActivity[];
             let newActivitiesToStore: StravaActivity[] = [];
 
             if (needsFullSync) {
                 const allActivities = await fetchAllStravaActivities(accessToken);
-                allRuns = allActivities.filter(a => a.type === 'Run');
-                newActivitiesToStore = allRuns;
-
-                const startOfMonth = new Date();
-                startOfMonth.setDate(1);
-                startOfMonth.setHours(0, 0, 0, 0);
-                monthlyRuns = allRuns.filter(a => new Date(a.start_date) >= startOfMonth);
+                newActivitiesToStore = allActivities.filter(a => a.type === 'Run');
             } else {
                 // Incremental sync
                 const lastActivityResult = await pool.query(
@@ -381,25 +284,7 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
                     else { newActivities = [...newActivities, ...activities]; page++; if (page > 5) break; }
                 }
 
-                const newRuns = newActivities.filter(a => a.type === 'Run');
-                newActivitiesToStore = newRuns;
-                monthlyRuns = newRuns.filter(a => new Date(a.start_date) >= startOfMonth);
-
-                const { rows: storedActivities } = await pool.query(
-                    `SELECT distance, start_date, strava_id FROM activities WHERE user_id = $1`,
-                    [profile.user_id]
-                );
-
-                const storedStravaIds = new Set(storedActivities.map(a => a.strava_id));
-                const uniqueNewRuns = newRuns.filter(r => !storedStravaIds.has(r.id));
-
-                allRuns = [
-                    ...uniqueNewRuns,
-                    ...storedActivities.map(a => ({
-                        id: a.strava_id || 0, name: '', distance: Number(a.distance) || 0,
-                        moving_time: 0, elapsed_time: 0, type: 'Run', start_date: a.start_date || '',
-                    })),
-                ];
+                newActivitiesToStore = newActivities.filter(a => a.type === 'Run');
             }
 
             // Fetch athlete profile
@@ -407,10 +292,6 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
 
             // Fetch detailed data for only 5 most recent activities (saves API budget)
             const activityDetails = await fetchRecentActivityDetails(accessToken, newActivitiesToStore, 5);
-
-            // Calculate totals
-            const totalDistance = allRuns.reduce((sum, a) => sum + a.distance, 0);
-            const totalRunsCount = allRuns.length;
 
             // Store activities in batches
             try {
@@ -453,21 +334,14 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
                 console.error('Error storing activities:', err);
             }
 
-            // Calculate streaks
-            const runDates = allRuns.map(r => new Date(r.start_date));
-            const { currentStreak, longestStreak } = calculateStreaks(runDates);
-
-            // Recalculate monthly leaderboard
-            await pool.query('SELECT recalculate_monthly_leaderboard($1)', [profile.user_id]);
-
-            // Update profile
+            // Update profile with athlete data + sync timestamp
             const currentProfile = await pool.query(
                 'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1', [profile.user_id]
             );
 
-            let updateQuery = `UPDATE profiles SET total_distance=$1, total_runs=$2, current_streak=$3, longest_streak=$4, last_synced_at=$5`;
-            let updateParams: any[] = [totalDistance, totalRunsCount, currentStreak, longestStreak, new Date().toISOString()];
-            let paramIdx = 6;
+            let updateQuery = `UPDATE profiles SET last_synced_at=$1`;
+            let updateParams: any[] = [new Date().toISOString()];
+            let paramIdx = 2;
 
             if (athlete) {
                 updateQuery += `, display_name=$${paramIdx}, avatar_url=$${paramIdx + 1}, city=$${paramIdx + 2}, country=$${paramIdx + 3}, weight=$${paramIdx + 4}, sex=$${paramIdx + 5}, measurement_preference=$${paramIdx + 6}, follower_count=$${paramIdx + 7}, friend_count=$${paramIdx + 8}, premium=$${paramIdx + 9}`;
@@ -485,22 +359,16 @@ async function doSyncWork(profiles: any[], forceFullSync: boolean) {
 
             await pool.query(updateQuery, updateParams);
 
-            // Check achievements
-            const newAchievements = await checkAndUnlockAchievements(profile.user_id, {
-                totalDistance, totalRuns: totalRunsCount, currentStreak, longestStreak,
-            });
-
-            // Recalculate challenge progress + personal records
-            await recalculateAllChallenges(profile.user_id);
-            await scanUserPRs(profile.user_id);
+            // Recompute totals, streaks, leaderboard, achievements, challenges, PRs
+            const postSync = await runPostSyncPipeline(profile.user_id);
 
             syncStatusMap.set(profile.user_id, {
                 status: 'done',
                 startedAt: Date.now(),
-                activities: totalRunsCount,
+                activities: postSync.totalRuns,
             });
 
-            console.log(`[sync] ✅ ${profile.user_id.slice(0, 8)}... done — ${totalRunsCount} runs, ${newAchievements.length} new achievements`);
+            console.log(`[sync] ✅ ${profile.user_id.slice(0, 8)}... done — ${postSync.totalRuns} runs, ${postSync.newAchievements.length} new achievements`);
         } catch (error: any) {
             console.error(`Sync error for user ${profile.user_id}:`, error);
             syncStatusMap.set(profile.user_id, { status: 'error', startedAt: Date.now(), error: error.message });
@@ -529,7 +397,7 @@ router.all('/', async (req: Request, res: Response) => {
             try {
                 const payload = verifyToken(authHeader.replace('Bearer ', ''));
                 authenticatedUserId = payload.user_id;
-                isAdmin = payload.role === 'admin';
+                isAdmin = await isAdminInDb(payload.user_id);
             } catch { /* invalid token */ }
         }
 

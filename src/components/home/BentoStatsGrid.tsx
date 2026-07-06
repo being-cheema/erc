@@ -1,26 +1,26 @@
 import { BarChart, Bar, ResponsiveContainer } from "recharts";
-import { useMonthlyDistance } from "@/hooks/useMonthlyStats";
+import { useMonthlyStats } from "@/hooks/useMonthlyStats";
 import { useWeeklyStats } from "@/hooks/useActivities";
-import { useAllTimeStats } from "@/hooks/useAllTimeStats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { Flame, TrendingUp } from "lucide-react";
 
 const BentoStatsGrid = () => {
-  const { data: monthlyDistance, isLoading: distLoading } = useMonthlyDistance();
+  const { data: monthlyStats, isLoading: monthlyLoading } = useMonthlyStats();
   const { data: weeklyData, isLoading: weeklyLoading } = useWeeklyStats();
-  const { data: allTimeStats, isLoading: statsLoading } = useAllTimeStats();
 
-  const distanceKm = monthlyDistance?.totalDistance ? (monthlyDistance.totalDistance / 1000).toFixed(1) : "0";
-  const totalCalories = allTimeStats?.totalCalories || 0;
-  const monthlyCalories = totalCalories > 0 ? Math.round(totalCalories / Math.max(1, allTimeStats?.totalRuns || 1)) : 0;
+  const distanceKm = monthlyStats?.totalDistance
+    ? (monthlyStats.totalDistance / 1000).toFixed(1)
+    : "0";
+  const monthlyCalories = monthlyStats?.totalCalories || 0;
 
-  const miniChartData = weeklyData?.slice(-7).map((d, i) => ({
-    day: i,
-    value: d.distance,
-  })) || [];
+  const miniChartData =
+    weeklyData?.slice(-7).map((d, i) => ({
+      day: i,
+      value: d.distance,
+    })) || [];
 
-  const isLoading = distLoading || weeklyLoading || statsLoading;
+  const isLoading = monthlyLoading || weeklyLoading;
 
   if (isLoading) {
     return (
@@ -31,7 +31,7 @@ const BentoStatsGrid = () => {
     );
   }
 
-  const ringProgress = Math.min(100, (monthlyCalories / 500) * 100);
+  const ringProgress = Math.min(100, (monthlyCalories / 5000) * 100);
   const circumference = 2 * Math.PI * 28;
   const strokeDash = (ringProgress / 100) * circumference;
 
@@ -69,7 +69,7 @@ const BentoStatsGrid = () => {
         </div>
       </motion.div>
 
-      {/* Calories Tile */}
+      {/* Calories Tile — monthly total, not all-time average (D6) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -79,25 +79,28 @@ const BentoStatsGrid = () => {
         <div>
           <div className="flex items-center gap-1.5 mb-2">
             <Flame className="w-4 h-4 text-primary" />
-            <p className="stat-label">Avg Calories</p>
+            <p className="stat-label">This Month</p>
           </div>
           <p className="text-4xl font-black tracking-tight text-foreground leading-none">
             {monthlyCalories.toLocaleString()}
             <span className="text-sm font-bold text-muted-foreground ml-1">kcal</span>
           </p>
         </div>
-        {/* Calorie ring visual - enlarged */}
         <div className="flex items-center justify-center mt-3">
           <div className="relative w-[72px] h-[72px]">
             <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90">
               <circle
-                cx="36" cy="36" r="28"
+                cx="36"
+                cy="36"
+                r="28"
                 fill="none"
                 stroke="hsl(var(--muted))"
                 strokeWidth="6"
               />
               <circle
-                cx="36" cy="36" r="28"
+                cx="36"
+                cy="36"
+                r="28"
                 fill="none"
                 stroke="hsl(var(--primary))"
                 strokeWidth="6"

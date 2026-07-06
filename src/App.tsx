@@ -1,31 +1,32 @@
 import { lazy, Suspense } from "react";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import OfflineScreen from "@/components/OfflineScreen";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import AuthRouter from "@/components/AuthRouter";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
+import { queryClient } from "@/lib/query-client";
 import AppLayout from "./components/layout/AppLayout";
 
 // Eagerly loaded — first screens users see
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
+import Welcome from "./pages/Welcome";
 import Signup from "./pages/Signup";
 import StravaCallback from "./pages/StravaCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConnectStrava from "./pages/ConnectStrava";
 import { api } from "@/integrations/supabase/client";
-import { isWeb } from "@/utils/platform";
+import { isNativePlatform } from "@/utils/platform";
 
 // Smart root redirect — platform-aware
 const RootRedirect = () => {
   const isAuthenticated = api.isAuthenticated();
   if (isAuthenticated) return <Navigate to="/home" replace />;
-  return <Navigate to={isWeb() ? "/landing" : "/login"} replace />;
+  return <Navigate to={isNativePlatform() ? "/welcome" : "/landing"} replace />;
 };
 
 // Lazy loaded — only fetched when user navigates to these routes
@@ -56,8 +57,6 @@ const PageLoader = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
-
 const AppContent = () => {
   // Handle Capacitor app lifecycle (session refresh on resume)
   useAppLifecycle();
@@ -68,6 +67,7 @@ const AppContent = () => {
         {/* Public routes — no auth required */}
         <Route path="/" element={<RootRedirect />} />
         <Route path="/landing" element={<Landing />} />
+        <Route path="/welcome" element={<Welcome />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -111,7 +111,6 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
           <Sonner />
           <BrowserRouter>
             <AppContent />

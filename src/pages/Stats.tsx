@@ -1,17 +1,29 @@
 import { motion } from "framer-motion";
 import { Loader2, Activity, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import StatsTabs from "@/components/stats/StatsTabs";
 import StreakCalendar from "@/components/stats/StreakCalendar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const Stats = () => {
-  const { data: profile, isLoading } = useProfile();
+  const navigate = useNavigate();
+  const { data: profile, isLoading, isError, refetch } = useProfile();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background safe-area-inset-top pb-24">
+        <ListErrorState onRetry={() => refetch()} />
       </div>
     );
   }
@@ -70,9 +82,15 @@ const Stats = () => {
                   <Activity className="w-8 h-8 text-primary-foreground" />
                 </div>
                 <h3 className="font-bold uppercase tracking-wide text-foreground mb-2 text-sm">No Activity Data</h3>
-                <p className="text-muted-foreground text-xs font-medium">
+                <p className="text-muted-foreground text-xs font-medium mb-4">
                   Connect your Strava account to see your running statistics here.
                 </p>
+                <Button
+                  onClick={() => navigate("/connect-strava")}
+                  className="bg-strava hover:bg-strava-dark text-white gap-2"
+                >
+                  Connect Strava
+                </Button>
               </CardContent>
             </Card>
           </motion.div>

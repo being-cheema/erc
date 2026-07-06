@@ -1,7 +1,9 @@
 // Self-hosted API client — replaces Supabase client
 // All hooks should use this instead of the old supabase client
 
-const API_BASE = import.meta.env.VITE_SUPABASE_URL || '';
+import { API_URL } from '@/config';
+
+const API_BASE = API_URL || '';
 
 class ApiClient {
   private tokenListeners: Set<(token: string | null) => void> = new Set();
@@ -62,6 +64,23 @@ class ApiClient {
 
   private notifyListeners(token: string | null) {
     this.tokenListeners.forEach(cb => cb(token));
+  }
+
+  // Resolve to true only when we hold a usable (non-expired) access token,
+  // refreshing it first if possible. Used by AuthRouter to gate protected routes.
+  async ensureFreshToken(): Promise<boolean> {
+    const token = this.getToken();
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (!payload.exp || payload.exp * 1000 >= Date.now()) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    if (!this.getRefreshToken()) return false;
+    return this.tryRefresh();
   }
 
   // Auto-refresh JWT using refresh token

@@ -9,13 +9,14 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefresh from "@/components/PullToRefresh";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { QK } from "@/lib/query-keys";
 
 const Leaderboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyLeaderboard();
   const { data: allTimeData, isLoading: allTimeLoading } = useAllTimeLeaderboard();
-  const { data: currentUser } = useCurrentUser();
+  const { user: currentUser } = useCurrentUser();
 
   const {
     isRefreshing,
@@ -29,7 +30,7 @@ const Leaderboard = () => {
     queryClient.invalidateQueries({ queryKey: ["profile"] });
     queryClient.invalidateQueries({ queryKey: ["leaderboard", "monthly"] });
     queryClient.invalidateQueries({ queryKey: ["leaderboard", "alltime"] });
-    queryClient.invalidateQueries({ queryKey: ["userRank"] });
+    queryClient.invalidateQueries({ queryKey: QK.userRank });
   });
 
   const getRankChange = (change: number | null) => {

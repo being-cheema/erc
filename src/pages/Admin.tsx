@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { toast } from "sonner";
+import { QK } from "@/lib/query-keys";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Select,
@@ -81,6 +82,15 @@ interface AdminChallenge {
   is_published: boolean | null;
   participant_count: number;
 }
+interface AdminUser {
+  id: string;
+  email: string;
+  created_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  member_id: string | null;
+  roles: string[];
+}
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -90,9 +100,8 @@ const Admin = () => {
   useEffect(() => {
     if (!adminLoading && !isAdmin) {
       toast.error("Access denied. Admin only.");
-      navigate("/home");
     }
-  }, [adminLoading, isAdmin, navigate]);
+  }, [adminLoading, isAdmin]);
 
   // Fetch data via admin API
   const { data: races, isLoading: racesLoading } = useQuery({
@@ -102,35 +111,46 @@ const Admin = () => {
   });
 
   const { data: blogPosts, isLoading: blogLoading } = useQuery({
-    queryKey: ["admin", "blog_posts"],
+    queryKey: QK.adminBlogPosts,
     queryFn: () => api.get('/api/blog'),
     enabled: isAdmin === true,
   });
 
   const { data: trainingPlans, isLoading: plansLoading } = useQuery({
-    queryKey: ["admin", "training_plans"],
+    queryKey: QK.adminTrainingPlans,
     queryFn: () => api.get('/api/training'),
     enabled: isAdmin === true,
   });
 
   const { data: challengesList, isLoading: challengesLoading } = useQuery({
-    queryKey: ["admin", "challenges"],
+    queryKey: QK.adminChallenges,
     queryFn: () => api.get('/api/admin/challenges'),
     enabled: isAdmin === true,
   });
 
   const { data: groupRunsList, isLoading: groupRunsLoading } = useQuery({
-    queryKey: ["admin", "group-runs"],
+    queryKey: QK.adminGroupRuns,
     queryFn: () => api.get('/api/admin/group-runs'),
     enabled: isAdmin === true,
   });
+  const { data: usersList, isLoading: usersLoading } = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => api.get('/api/admin/users'),
+    enabled: isAdmin === true,
+  });
 
+  // Show a loader until the admin check resolves, and redirect non-admins
+  // BEFORE any admin UI mounts (F6).
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/home" replace />;
   }
 
   return (
@@ -153,14 +173,14 @@ const Admin = () => {
 
       <div className="px-4 py-6">
         <Tabs defaultValue="races" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="races" className="gap-1 text-xs">
               <Trophy className="w-3.5 h-3.5" />
               Races
             </TabsTrigger>
             <TabsTrigger value="challenges" className="gap-1 text-xs">
               <Flame className="w-3.5 h-3.5" />
-              Dares
+              Challenges
             </TabsTrigger>
             <TabsTrigger value="group-runs" className="gap-1 text-xs">
               <Users className="w-3.5 h-3.5" />
@@ -173,6 +193,10 @@ const Admin = () => {
             <TabsTrigger value="training" className="gap-1 text-xs">
               <Target className="w-3.5 h-3.5" />
               Training
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-1 text-xs">
+              <Users className="w-3.5 h-3.5" />
+              Users
             </TabsTrigger>
           </TabsList>
 
@@ -194,6 +218,10 @@ const Admin = () => {
 
           <TabsContent value="training">
             <TrainingAdmin plans={trainingPlans || []} loading={plansLoading} />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UsersAdmin users={usersList || []} loading={usersLoading} />
           </TabsContent>
         </Tabs>
       </div>
@@ -389,8 +417,8 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "blog_posts"] });
-      queryClient.invalidateQueries({ queryKey: ["blog_posts"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminBlogPosts });
+      queryClient.invalidateQueries({ queryKey: QK.blogPosts });
       setEditing(null);
       setCreating(false);
       setForm({});
@@ -404,7 +432,8 @@ const BlogAdmin = ({ posts, loading }: { posts: BlogPost[]; loading: boolean }) 
       return api.delete(`/api/admin/blog/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "blog_posts"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminBlogPosts });
+      queryClient.invalidateQueries({ queryKey: QK.blogPosts });
       toast.success("Post deleted!");
     },
     onError: () => toast.error("Failed to delete post"),
@@ -525,8 +554,8 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "training_plans"] });
-      queryClient.invalidateQueries({ queryKey: ["training_plans"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminTrainingPlans });
+      queryClient.invalidateQueries({ queryKey: QK.trainingPlans });
       setEditing(null);
       setCreating(false);
       setForm({});
@@ -540,7 +569,8 @@ const TrainingAdmin = ({ plans, loading }: { plans: TrainingPlan[]; loading: boo
       return api.delete(`/api/admin/training/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "training_plans"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminTrainingPlans });
+      queryClient.invalidateQueries({ queryKey: QK.trainingPlans });
       toast.success("Plan deleted!");
     },
     onError: () => toast.error("Failed to delete plan"),
@@ -662,7 +692,8 @@ const ChallengesAdmin = ({ challenges, loading }: { challenges: AdminChallenge[]
       return api.post('/api/admin/challenges', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "challenges"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminChallenges });
+      queryClient.invalidateQueries({ queryKey: QK.challenges });
       setEditing(null); setCreating(false); setForm({});
       toast.success(editing ? "Challenge updated" : "Challenge created");
     },
@@ -672,7 +703,8 @@ const ChallengesAdmin = ({ challenges, loading }: { challenges: AdminChallenge[]
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/challenges/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "challenges"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminChallenges });
+      queryClient.invalidateQueries({ queryKey: QK.challenges });
       toast.success("Challenge deleted");
     },
   });
@@ -811,7 +843,8 @@ const GroupRunsAdmin = ({ runs, loading }: { runs: any[]; loading: boolean }) =>
         ? api.put(`/api/admin/group-runs/${editing}`, data)
         : api.post('/api/admin/group-runs', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "group-runs"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminGroupRuns });
+      queryClient.invalidateQueries({ queryKey: QK.groupRuns });
       setCreating(false); setEditing(null); setForm({});
       toast.success(editing ? "Group run updated" : "Group run created");
     },
@@ -821,7 +854,8 @@ const GroupRunsAdmin = ({ runs, loading }: { runs: any[]; loading: boolean }) =>
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/group-runs/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "group-runs"] });
+      queryClient.invalidateQueries({ queryKey: QK.adminGroupRuns });
+      queryClient.invalidateQueries({ queryKey: QK.groupRuns });
       toast.success("Group run deleted");
     },
   });
@@ -903,6 +937,49 @@ const GroupRunsAdmin = ({ runs, loading }: { runs: any[]; loading: boolean }) =>
           </CardContent>
         </Card>
       ))}
+    </div>
+  );
+};
+
+const UsersAdmin = ({ users, loading }: { users: AdminUser[]; loading: boolean }) => {
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/users/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast.success("User removed");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to remove user");
+    },
+  });
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Total users: {users.length}</p>
+      {users.map((u) => {
+        const isAdmin = u.roles?.includes("admin");
+        return (
+          <Card key={u.id}>
+            <CardContent className="p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{u.display_name || u.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {u.member_id ? `${u.member_id} • ` : ""}
+                  {isAdmin ? "Admin" : "Member"}
+                </p>
+              </div>
+              <DeleteConfirmDialog
+                label="User"
+                onConfirm={() => deleteMutation.mutate(u.id)}
+              />
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 };

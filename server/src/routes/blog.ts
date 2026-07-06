@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { optionalAuth } from '../middleware/auth.js';
+import { optionalAuth, isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/blog — published blog posts
 router.get('/', optionalAuth, async (req: Request, res: Response) => {
     try {
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = await isAdminInDb(req.user?.user_id);
         const query = isAdmin
             ? 'SELECT * FROM blog_posts ORDER BY created_at DESC'
             : 'SELECT * FROM blog_posts WHERE is_published = true ORDER BY created_at DESC';
@@ -22,7 +22,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
 // GET /api/blog/:slug — single blog post
 router.get('/:slug', optionalAuth, async (req: Request, res: Response) => {
     try {
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = await isAdminInDb(req.user?.user_id);
         const query = isAdmin
             ? 'SELECT * FROM blog_posts WHERE slug = $1'
             : 'SELECT * FROM blog_posts WHERE slug = $1 AND is_published = true';

@@ -3,20 +3,32 @@ import crypto from 'crypto';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 const KEY_HEX = process.env.TOKEN_ENCRYPTION_KEY;
-if (!KEY_HEX || KEY_HEX.length !== 64) {
+
+function isValidKey(hex: string | undefined): hex is string {
+    return !!hex && hex.length === 64;
+}
+
+if (IS_PRODUCTION && !isValidKey(KEY_HEX)) {
+    throw new Error(
+        '[crypto] TOKEN_ENCRYPTION_KEY must be set to a 64-character hex string in production'
+    );
+}
+
+if (!IS_PRODUCTION && !isValidKey(KEY_HEX)) {
     console.warn('[crypto] TOKEN_ENCRYPTION_KEY not set or invalid — token encryption disabled');
 }
 
-const KEY = KEY_HEX ? Buffer.from(KEY_HEX, 'hex') : null;
+const KEY = isValidKey(KEY_HEX) ? Buffer.from(KEY_HEX, 'hex') : null;
 
 /**
  * Encrypt a plaintext string using AES-256-GCM.
  * Returns format: "iv:authTag:ciphertext" (all hex-encoded)
  */
 export function encryptToken(plaintext: string): string {
-    if (!KEY) return plaintext; // Fallback if key not configured
+    if (!KEY) return plaintext; // Fallback if key not configured (dev only)
 
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);

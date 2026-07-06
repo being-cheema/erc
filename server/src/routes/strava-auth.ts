@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { signToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
 import { encryptToken, decryptToken } from '../utils/crypto.js';
 import crypto from 'crypto';
+import { generateMemberId } from '../utils/member-id.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || '';
 
@@ -38,18 +39,40 @@ const ALLOWED_REDIRECT_URIS = [
     'http://localhost:5173/auth/callback',
 ];
 
-// ─── PENDING TOKENS STORE (for polling-based native auth) ───
-// The native app generates a session_id, passes it as `state` to Strava.
-// After callback, the JWT is stored here. The app polls /poll?state=<id> to retrieve it.
+// Server-issued poll states for native OAuth (256-bit entropy, single-use)
+const issuedPollStates = new Map<string, { userId: string; created: number }>();
+
+// Completed tokens awaiting poll pickup
 const pendingTokens = new Map<string, { token: string; refresh_token: string; is_new_user: boolean; athlete_name: string; created: number }>();
 
-// Clean up expired tokens every 5 minutes (tokens expire after 5 min)
+const POLL_TTL_MS = 5 * 60 * 1000;
+
 setInterval(() => {
     const now = Date.now();
+    for (const [key, val] of issuedPollStates) {
+        if (now - val.created > POLL_TTL_MS) issuedPollStates.delete(key);
+    }
     for (const [key, val] of pendingTokens) {
-        if (now - val.created > 5 * 60 * 1000) pendingTokens.delete(key);
+        if (now - val.created > POLL_TTL_MS) pendingTokens.delete(key);
     }
 }, 5 * 60 * 1000);
+
+function issueNativePollState(userId: string): string {
+    const pollState = crypto.randomBytes(32).toString('hex');
+    issuedPollStates.set(pollState, { userId, created: Date.now() });
+    return pollState;
+}
+
+function isServerIssuedPollState(pollState: string, userId?: string): boolean {
+    const entry = issuedPollStates.get(pollState);
+    if (!entry) return false;
+    if (Date.now() - entry.created > POLL_TTL_MS) {
+        issuedPollStates.delete(pollState);
+        return false;
+    }
+    if (userId && entry.userId !== userId) return false;
+    return true;
+}
 
 router.get('/', async (req: Request, res: Response) => {
     try {
@@ -81,6 +104,15 @@ router.get('/', async (req: Request, res: Response) => {
                 return res.status(401).json({ error: 'Authentication required. Please log in first.' });
             }
 
+            const isNative = req.query.native === '1';
+            let nativePollState: string | undefined;
+
+            if (isNative) {
+                nativePollState = issueNativePollState(authenticatedUserId);
+            } else if (req.query.state) {
+                return res.status(400).json({ error: 'Client-provided poll state is not allowed. Use native=1 for native auth.' });
+            }
+
             const stravaAuthUrl = new URL('https://www.strava.com/oauth/authorize');
             stravaAuthUrl.searchParams.set('client_id', STRAVA_CLIENT_ID);
             stravaAuthUrl.searchParams.set('response_type', 'code');
@@ -88,12 +120,15 @@ router.get('/', async (req: Request, res: Response) => {
             stravaAuthUrl.searchParams.set('approval_prompt', 'auto');
             stravaAuthUrl.searchParams.set('scope', 'read,activity:read_all,profile:read_all');
 
-            // Encode user_id (and optional native poll state) in the state param with HMAC
-            const nativeState = req.query.state as string;
-            const statePayload = signState(authenticatedUserId, nativeState || undefined);
+            const statePayload = signState(authenticatedUserId, nativePollState);
             stravaAuthUrl.searchParams.set('state', statePayload);
 
-            return res.json({ url: stravaAuthUrl.toString() });
+            const response: { url: string; state?: string; poll_state?: string } = { url: stravaAuthUrl.toString() };
+            if (nativePollState) {
+                response.poll_state = nativePollState;
+                response.state = nativePollState;
+            }
+            return res.json(response);
         }
 
         // ─── CALLBACK: Exchange code for tokens, LINK to existing user ───
@@ -162,7 +197,7 @@ router.get('/', async (req: Request, res: Response) => {
             );
 
             const fallbackName = currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`;
-            const fallbackAvatar = currentProfile.rows[0]?.avatar_url || athlete.profile;
+            const fallbackAvatar = currentProfile.rows[0]?.avatar_url || athlete.profile || athlete.profile_medium;
             const fallbackCity = currentProfile.rows[0]?.city || athlete.city || null;
 
             await pool.query(
@@ -223,8 +258,12 @@ router.get('/', async (req: Request, res: Response) => {
                 [userId, refreshToken, refreshExpiresAt.toISOString()]
             );
 
-            // If native poll state, store token for polling
+            // If native poll state, store token for polling (must be server-issued)
             if (nativeState) {
+                if (!isServerIssuedPollState(nativeState, userId)) {
+                    return res.status(400).json({ error: 'Invalid or expired native poll state.' });
+                }
+                issuedPollStates.delete(nativeState);
                 pendingTokens.set(nativeState, {
                     token,
                     refresh_token: refreshToken,
@@ -357,25 +396,28 @@ router.get('/callback', async (req: Request, res: Response) => {
         if (existingProfile.rows.length > 0) {
             userId = existingProfile.rows[0].user_id;
             const currentProfile = await pool.query(
-                'SELECT display_name, avatar_url FROM profiles WHERE user_id = $1',
+                'SELECT display_name, avatar_url, member_id FROM profiles WHERE user_id = $1',
                 [userId]
             );
+            const memberId = currentProfile.rows[0]?.member_id || generateMemberId();
             await pool.query(
                 `UPDATE profiles SET
                     strava_access_token = $1,
                     strava_refresh_token = $2,
                     strava_token_expires_at = $3,
-                    display_name = $4,
-                    avatar_url = $5,
-                    city = $6
+                    display_name = COALESCE(NULLIF(display_name, ''), $4),
+                    avatar_url = COALESCE(NULLIF(avatar_url, ''), $5),
+                    city = COALESCE(NULLIF(city, ''), $6),
+                    member_id = COALESCE(member_id, $8)
                 WHERE user_id = $7`,
                 [
                     encryptToken(access_token), encryptToken(refresh_token),
                     new Date(expires_at * 1000).toISOString(),
-                    currentProfile.rows[0]?.display_name || `${athlete.firstname} ${athlete.lastname}`,
-                    currentProfile.rows[0]?.avatar_url || athlete.profile,
+                    `${athlete.firstname} ${athlete.lastname}`,
+                    athlete.profile || athlete.profile_medium,
                     athlete.city || null,
                     userId,
+                    memberId,
                 ]
             );
         } else {
@@ -386,31 +428,37 @@ router.get('/callback', async (req: Request, res: Response) => {
             if (existingUser.rows.length > 0) {
                 userId = existingUser.rows[0].id;
                 isNewUser = false;
+                const memberId = generateMemberId();
                 await pool.query(
-                    `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city, member_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     ON CONFLICT (user_id) DO UPDATE SET
                         strava_id = $2, strava_access_token = $3, strava_refresh_token = $4,
-                        strava_token_expires_at = $5, display_name = $6, avatar_url = $7, city = $8`,
+                        strava_token_expires_at = $5,
+                        display_name = COALESCE(NULLIF(profiles.display_name, ''), $6),
+                        avatar_url = COALESCE(NULLIF(profiles.avatar_url, ''), $7),
+                        city = COALESCE(NULLIF(profiles.city, ''), $8),
+                        member_id = COALESCE(profiles.member_id, $9)`,
                     [userId, athlete.id.toString(), encryptToken(access_token), encryptToken(refresh_token),
                         new Date(expires_at * 1000).toISOString(),
-                        `${athlete.firstname} ${athlete.lastname}`, athlete.profile, athlete.city || null]
+                        `${athlete.firstname} ${athlete.lastname}`, athlete.profile || athlete.profile_medium, athlete.city || null, memberId]
                 );
                 await pool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'member') ON CONFLICT (user_id, role) DO NOTHING`, [userId]);
                 await pool.query(`INSERT INTO notification_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, [userId]);
             } else {
                 const passwordHash = crypto.randomUUID();
+                const memberId = generateMemberId();
                 const newUser = await pool.query(
                     `INSERT INTO users (email, password_hash, user_metadata) VALUES ($1, $2, $3) RETURNING id`,
                     [email, passwordHash, JSON.stringify({ strava_id: athlete.id, display_name: `${athlete.firstname} ${athlete.lastname}`, avatar_url: athlete.profile })]
                 );
                 userId = newUser.rows[0].id;
                 await pool.query(
-                    `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    `INSERT INTO profiles (user_id, strava_id, strava_access_token, strava_refresh_token, strava_token_expires_at, display_name, avatar_url, city, member_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                     [userId, athlete.id.toString(), encryptToken(access_token), encryptToken(refresh_token),
                         new Date(expires_at * 1000).toISOString(),
-                        `${athlete.firstname} ${athlete.lastname}`, athlete.profile, athlete.city || null]
+                        `${athlete.firstname} ${athlete.lastname}`, athlete.profile || athlete.profile_medium, athlete.city || null, memberId]
                 );
                 await pool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'member')`, [userId]);
                 await pool.query(`INSERT INTO notification_preferences (user_id) VALUES ($1)`, [userId]);
@@ -432,10 +480,20 @@ router.get('/callback', async (req: Request, res: Response) => {
             [userId, refreshToken, refreshExpiresAt.toISOString()]
         );
 
-        // Store token for polling — the app will retrieve it via GET /poll?state=<id>
-        const state = (req.query.state as string) || '';
-        if (state) {
-            pendingTokens.set(state, {
+        // Store token for polling — extract server-issued poll state from signed OAuth state
+        const stateParam = req.query.state as string;
+        let nativePollState: string | null = null;
+        if (stateParam) {
+            const stateResult = verifyState(stateParam);
+            nativePollState = stateResult?.nativeState ?? null;
+        }
+
+        if (nativePollState) {
+            if (!isServerIssuedPollState(nativePollState, userId)) {
+                return res.status(400).send('Invalid or expired auth session. Please try again.');
+            }
+            issuedPollStates.delete(nativePollState);
+            pendingTokens.set(nativePollState, {
                 token,
                 refresh_token: refreshToken,
                 is_new_user: isNewUser,
@@ -476,20 +534,22 @@ router.get('/poll', (req: Request, res: Response) => {
     }
 
     const pending = pendingTokens.get(state);
-    if (!pending) {
-        // Not ready yet — app should keep polling
-        return res.json({ ready: false });
+    if (pending) {
+        pendingTokens.delete(state);
+        return res.json({
+            ready: true,
+            token: pending.token,
+            refresh_token: pending.refresh_token,
+            is_new_user: pending.is_new_user,
+            athlete_name: pending.athlete_name,
+        });
     }
 
-    // Token is ready — return it and delete from store (one-time use)
-    pendingTokens.delete(state);
-    return res.json({
-        ready: true,
-        token: pending.token,
-        refresh_token: pending.refresh_token,
-        is_new_user: pending.is_new_user,
-        athlete_name: pending.athlete_name,
-    });
+    if (!isServerIssuedPollState(state)) {
+        return res.status(404).json({ error: 'Unknown or expired poll state' });
+    }
+
+    return res.json({ ready: false });
 });
 
 export default router;

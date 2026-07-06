@@ -2,24 +2,49 @@ import { useState, useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { api } from "@/integrations/supabase/client";
 
-const AuthRouter = () => {
-  // Avoid false redirects while access token refresh is in-flight.
-  const isAuthenticated = api.isAuthenticated();
+type AuthState = "pending" | "authenticated" | "unauthenticated";
 
-  // Subscribe to auth changes so we re-render on login/logout
-  const [, forceUpdate] = useState(0);
+const AuthRouter = () => {
+  const [authState, setAuthState] = useState<AuthState>("pending");
+
+  // Validate (and if needed refresh) the token once on mount, so data hooks
+  // only run with a genuinely valid session.
   useEffect(() => {
-    const unsubscribe = api.onAuthStateChange(() => {
-      forceUpdate(n => n + 1);
+    let cancelled = false;
+    api.ensureFreshToken().then((ok) => {
+      if (!cancelled) {
+        setAuthState(ok ? "authenticated" : "unauthenticated");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // React to logout while mounted
+  useEffect(() => {
+    const unsubscribe = api.onAuthStateChange((token) => {
+      if (!token) setAuthState("unauthenticated");
     });
     return unsubscribe;
   }, []);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  switch (authState) {
+    case "pending":
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+      );
+    case "unauthenticated":
+      return <Navigate to="/login" replace />;
+    case "authenticated":
+      return <Outlet />;
+    default: {
+      const exhaustive: never = authState;
+      return exhaustive;
+    }
   }
-
-  return <Outlet />;
 };
 
 export default AuthRouter;

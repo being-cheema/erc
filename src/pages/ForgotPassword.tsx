@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import logo from "@/assets/logo.png";
 import { Link } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { API_URL } from "@/config";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -22,7 +23,7 @@ const ForgotPassword = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/api/auth/forgot-password`,
+        `${API_URL}/api/auth/forgot-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -115,7 +116,7 @@ const ForgotPassword = () => {
                   </div>
 
                   {error && (
-                    <p className="text-sm text-center text-red-400 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                    <p role="alert" className="text-sm text-center text-red-400 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
                       {error}
                     </p>
                   )}

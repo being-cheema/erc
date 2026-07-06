@@ -232,11 +232,19 @@ router.delete('/group-runs/:id', async (req: Request, res: Response) => {
 router.get('/users', async (_req: Request, res: Response) => {
     try {
         const { rows } = await pool.query(
-            `SELECT u.id, u.email, p.display_name, p.avatar_url, ur.role
-       FROM users u
-       LEFT JOIN profiles p ON p.user_id = u.id
-       LEFT JOIN user_roles ur ON ur.user_id = u.id
-       ORDER BY p.display_name`
+            `SELECT
+                u.id,
+                u.email,
+                u.created_at,
+                p.display_name,
+                p.avatar_url,
+                p.member_id,
+                COALESCE(array_agg(DISTINCT ur.role) FILTER (WHERE ur.role IS NOT NULL), ARRAY[]::app_role[]) AS roles
+             FROM users u
+             LEFT JOIN profiles p ON p.user_id = u.id
+             LEFT JOIN user_roles ur ON ur.user_id = u.id
+             GROUP BY u.id, u.email, u.created_at, p.display_name, p.avatar_url, p.member_id
+             ORDER BY COALESCE(p.display_name, u.email) ASC`
         );
         return res.json(rows);
     } catch (err) {

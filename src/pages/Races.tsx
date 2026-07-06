@@ -8,6 +8,7 @@ import { useRaces, useRegisterForRace, useUnregisterFromRace, Race } from "@/hoo
 import { format, differenceInDays, isPast } from "date-fns";
 import { toast } from "sonner";
 import RaceCalendar from "@/components/races/RaceCalendar";
+import { ListErrorState } from "@/components/ListErrorState";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/sheet";
 
 const Races = () => {
-  const { data: races, isLoading } = useRaces();
+  const { data: races, isLoading, isError, refetch } = useRaces();
   const registerMutation = useRegisterForRace();
   const unregisterMutation = useUnregisterFromRace();
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
@@ -197,6 +198,8 @@ const Races = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : (
           <Tabs defaultValue="calendar" className="space-y-4">
             <TabsList className="w-full grid grid-cols-2 h-11 bg-muted">

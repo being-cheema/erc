@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { isWeb } from "@/utils/platform";
+import { useStravaConnect } from "@/hooks/useStravaConnect";
 import MembershipCard from "@/components/MembershipCard";
 const TUTORIAL_SEEN_KEY = "erc_tutorial_seen_v1";
 
@@ -48,7 +49,17 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isConnectingStrava, setIsConnectingStrava] = useState(false);
+  const {
+    connect: connectStrava,
+    isConnecting: isConnectingStrava,
+    error: stravaConnectError,
+  } = useStravaConnect();
+
+  useEffect(() => {
+    if (stravaConnectError) {
+      toast.error(stravaConnectError);
+    }
+  }, [stravaConnectError]);
 
 
   // Fetch notification preferences
@@ -202,24 +213,6 @@ const Settings = () => {
     }
   };
 
-  const handleConnectStrava = async () => {
-    setIsConnectingStrava(true);
-    try {
-      const redirectUri = `${window.location.origin}/auth/callback`;
-      const token = api.getToken();
-      if (!token) { navigate("/login"); return; }
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const data = await response.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      toast.error("Failed to start Strava connection");
-      setIsConnectingStrava(false);
-    }
-  };
-
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast.error("Passwords don't match");
@@ -274,7 +267,7 @@ const Settings = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Settings</h1>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Profile</h1>
             <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">{user?.email}</p>
           </div>
         </div>
@@ -523,7 +516,7 @@ const Settings = () => {
                     <p className="text-muted-foreground text-sm">Link Strava to sync your runs</p>
                   </div>
                 </div>
-                <Button onClick={handleConnectStrava} disabled={isConnectingStrava} className="w-full mt-4 bg-strava hover:bg-strava-dark text-white">
+                <Button onClick={connectStrava} disabled={isConnectingStrava} className="w-full mt-4 bg-strava hover:bg-strava-dark text-white">
                   {isConnectingStrava ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LinkIcon className="w-4 h-4 mr-2" />}
                   Connect Strava
                 </Button>
@@ -600,7 +593,7 @@ const Settings = () => {
             <Card className="border-border/50">
               <CardContent className="p-0">
                 <a
-                  href="/downloads/erode-runners-club.apk"
+                  href="https://api.eroderunnersclub.com/downloads/erc-latest.apk"
                   className="w-full flex items-center gap-3 p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">

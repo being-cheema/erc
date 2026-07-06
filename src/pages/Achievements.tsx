@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAchievementsWithStatus } from "@/hooks/useAchievements";
 import { useProfile } from "@/hooks/useProfile";
 import { format } from "date-fns";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const getCategoryIcon = (category: string) => {
   switch (category.toLowerCase()) {
@@ -28,7 +29,7 @@ const getIconEmoji = (icon: string) => {
 };
 
 const Achievements = () => {
-  const { data: achievements, isLoading } = useAchievementsWithStatus();
+  const { data: achievements, isLoading, isError, refetch } = useAchievementsWithStatus();
   const { data: profile } = useProfile();
 
   const unlockedCount = achievements?.filter(a => a.unlocked).length || 0;
@@ -120,6 +121,8 @@ const Achievements = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : !achievements || achievements.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

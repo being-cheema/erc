@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/training — published training plans
 router.get('/', optionalAuth, async (req: Request, res: Response) => {
     try {
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = await isAdminInDb(req.user?.user_id);
         const query = isAdmin
             ? 'SELECT * FROM training_plans ORDER BY created_at DESC'
             : 'SELECT * FROM training_plans WHERE is_published = true ORDER BY created_at DESC';
@@ -39,6 +39,12 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
         }
 
         const plan = plans[0];
+
+        const isAdmin = req.user ? await isAdminInDb(req.user.user_id) : false;
+        if (!plan.is_published && !isAdmin) {
+            return res.status(404).json({ error: 'Plan not found' });
+        }
+
         plan.weeks = weeks;
 
         // Get user progress if authenticated
@@ -59,6 +65,18 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
 // POST /api/training/:planId/progress/:workoutId — mark workout as complete
 router.post('/:planId/progress/:workoutId', requireAuth, async (req: Request, res: Response) => {
     try {
+        const { rows: workoutRows } = await pool.query(
+            `SELECT tw.id
+             FROM training_workouts tw
+             JOIN training_weeks twk ON twk.id = tw.week_id
+             WHERE tw.id = $1 AND twk.plan_id = $2`,
+            [req.params.workoutId, req.params.planId]
+        );
+
+        if (!workoutRows.length) {
+            return res.status(404).json({ error: 'Workout not found in this plan' });
+        }
+
         await pool.query(
             `INSERT INTO user_training_progress (user_id, plan_id, workout_id)
        VALUES ($1, $2, $3) ON CONFLICT (user_id, workout_id) DO NOTHING`,

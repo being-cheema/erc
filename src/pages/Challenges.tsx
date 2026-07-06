@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useChallenges, Challenge } from "@/hooks/useChallenges";
 import { useNavigate } from "react-router-dom";
 import { useHaptics } from "@/hooks/useHaptics";
+import { ListErrorState } from "@/components/ListErrorState";
 import { differenceInDays, isPast, isFuture } from "date-fns";
 
 const getChallengeIcon = (type: string) => {
@@ -66,7 +67,7 @@ const getStatus = (challenge: Challenge) => {
 };
 
 const Challenges = () => {
-  const { data: challenges, isLoading } = useChallenges();
+  const { data: challenges, isLoading, isError, refetch } = useChallenges();
   const navigate = useNavigate();
   const { lightImpact } = useHaptics();
 
@@ -97,7 +98,7 @@ const Challenges = () => {
           navigate(`/challenges/${challenge.id}`);
         }}
       >
-        <Card className="cursor-pointer card-hover border-border/50 overflow-hidden">
+        <Card className="cursor-pointer glass-card-hover border-border/50 overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -161,6 +162,8 @@ const Challenges = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : !challenges || challenges.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ChevronRight, Settings, Dumbbell, Link as LinkIcon, Users, Zap, Medal, IdCard } from "lucide-react";
+import { ChevronRight, Settings, Dumbbell, Link as LinkIcon, Users, Zap, Medal, IdCard, Trophy, Flame, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
@@ -23,6 +23,22 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import MembershipCard from "@/components/MembershipCard";
+import { ListErrorState } from "@/components/ListErrorState";
+
+const STRAVA_NUDGE_KEY = "strava_nudge_dismissed";
+const STRAVA_NUDGE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+function isStravaNudgeDismissed(): boolean {
+  const raw = localStorage.getItem(STRAVA_NUDGE_KEY);
+  if (!raw) return false;
+  const dismissedAt = Number(raw);
+  if (Number.isNaN(dismissedAt)) return false;
+  return Date.now() - dismissedAt < STRAVA_NUDGE_TTL_MS;
+}
+
+function dismissStravaNudge() {
+  localStorage.setItem(STRAVA_NUDGE_KEY, String(Date.now()));
+}
 
 
 const motivationalLines = [
@@ -94,13 +110,14 @@ const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { data: profile } = useProfile();
+  const { data: profile, isError: profileError, refetch: refetchProfile } = useProfile();
   const { data: groupRuns } = useGroupRuns();
   const { data: userRank } = useUserRank();
   const { lightImpact } = useHaptics();
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [nudgeDismissed, setNudgeDismissed] = useState(isStravaNudgeDismissed);
 
   const {
     isRefreshing,
@@ -137,6 +154,13 @@ const Home = () => {
 
   const currentStreak = profile?.current_streak || 0;
   const isNewUnconnectedUser = !!profile && !profile.strava_id && (profile.total_runs || 0) === 0;
+  const showStravaNudge =
+    !nudgeDismissed &&
+    !!profile &&
+    !profile.strava_id &&
+    (isNewUnconnectedUser || (profile.total_runs || 0) > 0);
+  const showStatsSection =
+    !!profile?.strava_id || (!showStravaNudge && !isNewUnconnectedUser);
   const tutorialTarget = tutorialSteps[tutorialStep]?.target ?? "";
   
   // Pick a motivational line based on day
@@ -172,6 +196,19 @@ const Home = () => {
     }
     fallback();
   };
+
+  const handleDismissNudge = () => {
+    dismissStravaNudge();
+    setNudgeDismissed(true);
+  };
+
+  if (profileError) {
+    return (
+      <div className="min-h-screen bg-background safe-area-inset-top pb-32">
+        <ListErrorState onRetry={() => refetchProfile()} />
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -251,57 +288,46 @@ const Home = () => {
       </motion.div>
 
       <div className="px-5 space-y-3">
-        {/* Onboarding state for new users who skipped Strava */}
-        {isNewUnconnectedUser && (
+        {/* Strava connect nudge — dismissible, re-shows after 14 days (Q11) */}
+        {showStravaNudge && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-card p-6 text-center space-y-4"
+            className="glass-card p-6 text-center space-y-4 relative"
           >
+            <button
+              type="button"
+              onClick={handleDismissNudge}
+              aria-label="Dismiss Strava connect reminder"
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
             <div className="w-16 h-16 mx-auto rounded-2xl bg-strava/10 flex items-center justify-center">
               <LinkIcon className="w-8 h-8 text-strava" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Connect Strava to get started</h3>
-              <p className="text-sm text-muted-foreground mt-1">Sync your runs to unlock stats, leaderboard rank, PR detection, and streak tracking.</p>
+              <h3 className="text-lg font-bold text-foreground">
+                {isNewUnconnectedUser ? "Connect Strava to get started" : "Reconnect Strava"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isNewUnconnectedUser
+                  ? "Sync your runs to unlock stats, leaderboard rank, PR detection, and streak tracking."
+                  : "Reconnect to resume sync for stats, challenges, and PR tracking."}
+              </p>
             </div>
             <Button
               onClick={() => navigate("/connect-strava")}
               className="bg-strava hover:bg-strava-dark text-white gap-2"
             >
               <LinkIcon className="w-4 h-4" />
-              Connect Now
+              {isNewUnconnectedUser ? "Connect Now" : "Reconnect"}
             </Button>
           </motion.div>
         )}
 
-        {!isNewUnconnectedUser && (
+        {showStatsSection && (
           <>
-            {/* Empty state when Strava is disconnected after onboarding */}
-            {profile && !profile.strava_id && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-6 text-center space-y-4"
-              >
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-strava/10 flex items-center justify-center">
-                  <LinkIcon className="w-8 h-8 text-strava" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">Reconnect Strava</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Reconnect to resume sync for stats, challenges, and PR tracking.</p>
-                </div>
-                <Button
-                  onClick={() => navigate("/connect-strava")}
-                  className="bg-strava hover:bg-strava-dark text-white gap-2"
-                >
-                  <LinkIcon className="w-4 h-4" />
-                  Connect Now
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Bento Stats - Distance + Calories */}
             <BentoStatsGrid />
 
             {/* Secondary Stats Row - Rank / Streak / Runs */}
@@ -342,7 +368,6 @@ const Home = () => {
               </div>
             </motion.div>
 
-            {/* Activity Feed with category filters */}
             <ActivityFeed />
           </>
         )}
@@ -410,14 +435,8 @@ const Home = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="grid grid-cols-2 gap-3"
+          className="grid grid-cols-3 gap-3"
         >
-          <div className="press-scale cursor-pointer" onClick={() => handleCardTap("/group-runs")}>
-            <div className="glass-card p-4 text-center">
-              <Users className="w-5 h-5 text-primary mx-auto mb-1.5" />
-              <p className="text-[11px] font-bold text-foreground">Group Runs</p>
-            </div>
-          </div>
           <div className="press-scale cursor-pointer" onClick={() => handleCardTap("/personal-records")}>
             <div className="glass-card p-4 text-center">
               <Zap className="w-5 h-5 text-primary mx-auto mb-1.5" />
@@ -428,6 +447,18 @@ const Home = () => {
             <div className="glass-card p-4 text-center">
               <Medal className="w-5 h-5 text-primary mx-auto mb-1.5" />
               <p className="text-[11px] font-bold text-foreground">Race Log</p>
+            </div>
+          </div>
+          <div className="press-scale cursor-pointer" onClick={() => handleCardTap("/leaderboard")}>
+            <div className="glass-card p-4 text-center">
+              <Trophy className="w-5 h-5 text-primary mx-auto mb-1.5" />
+              <p className="text-[11px] font-bold text-foreground">Ranks</p>
+            </div>
+          </div>
+          <div className="press-scale cursor-pointer" onClick={() => handleCardTap("/challenges")}>
+            <div className="glass-card p-4 text-center">
+              <Flame className="w-5 h-5 text-primary mx-auto mb-1.5" />
+              <p className="text-[11px] font-bold text-foreground">Challenges</p>
             </div>
           </div>
           <div className="press-scale cursor-pointer" onClick={() => setIsCardOpen(true)}>

@@ -9,6 +9,7 @@ import { useMyRaceResults, usePBBoard, useAddRaceResult, useDeleteRaceResult } f
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const CATEGORIES: Record<string, string> = {
   '5k': '5K', '10k': '10K', 'half_marathon': 'Half Marathon',
@@ -47,8 +48,8 @@ function formatFinishTime(seconds: number): string {
 }
 
 const RaceResults = () => {
-  const { data: myResults, isLoading: myLoading } = useMyRaceResults();
-  const { data: pbBoard, isLoading: pbLoading } = usePBBoard();
+  const { data: myResults, isLoading: myLoading, isError: myError, refetch: refetchMyResults } = useMyRaceResults();
+  const { data: pbBoard, isLoading: pbLoading, isError: pbError, refetch: refetchPbBoard } = usePBBoard();
   const addMutation = useAddRaceResult();
   const deleteMutation = useDeleteRaceResult();
   const [showForm, setShowForm] = useState(false);
@@ -156,6 +157,8 @@ const RaceResults = () => {
           <TabsContent value="mine" className="space-y-3">
             {myLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : myError ? (
+              <ListErrorState onRetry={() => refetchMyResults()} />
             ) : !myResults?.length ? (
               <div className="text-center py-12">
                 <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4"><Trophy className="w-10 h-10 text-muted-foreground" /></div>
@@ -191,6 +194,8 @@ const RaceResults = () => {
           <TabsContent value="pb" className="space-y-3">
             {pbLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : pbError ? (
+              <ListErrorState onRetry={() => refetchPbBoard()} />
             ) : !pbBoard?.length ? (
               <div className="text-center py-12">
                 <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4"><Medal className="w-10 h-10 text-muted-foreground" /></div>

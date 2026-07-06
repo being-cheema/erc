@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/integrations/supabase/client";
+import { API_URL } from "@/config";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, CheckCircle2, TrendingUp, Trophy, XCircle, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -20,6 +22,7 @@ interface SyncState {
 const StravaCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [syncState, setSyncState] = useState<SyncState>({
     step: "auth",
     message: "Connecting to Strava...",
@@ -78,7 +81,7 @@ const StravaCallback = () => {
       // Call our self-hosted API (same paths as Supabase edge functions)
       const state = searchParams.get("state") || "";
       const callbackResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=callback&code=${code}&state=${encodeURIComponent(state)}`,
+        `${API_URL}/functions/v1/strava-auth?action=callback&code=${code}&state=${encodeURIComponent(state)}`,
         { method: "GET", headers: { "Content-Type": "application/json" } }
       );
 
@@ -109,7 +112,7 @@ const StravaCallback = () => {
 
       try {
         await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava`,
+          `${API_URL}/functions/v1/sync-strava`,
           {
             method: "POST",
             headers: {
@@ -127,7 +130,6 @@ const StravaCallback = () => {
 
       let attempts = 0;
       const maxAttempts = 120; // 2 minutes max
-      let importedActivities: number | null = null;
 
       const pollSync = async (): Promise<void> => {
         while (attempts < maxAttempts) {
@@ -136,7 +138,7 @@ const StravaCallback = () => {
 
           try {
             const statusRes = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-strava/status/${userId}`,
+              `${API_URL}/functions/v1/sync-strava/status/${userId}`,
               { headers: { Authorization: `Bearer ${data.token}` } }
             );
             const statusData = await statusRes.json();
@@ -148,7 +150,6 @@ const StravaCallback = () => {
                 statusData.total_activities ??
                 statusData.count;
               if (typeof importedCount === "number") {
-                importedActivities = importedCount;
                 setSyncState((prev) => ({ ...prev, activitiesFound: importedCount }));
               }
               setSyncState({ step: "calculating", message: "Calculating your stats...", progress: 80 });
@@ -184,15 +185,14 @@ const StravaCallback = () => {
         progress: 100,
       });
       toast.dismiss(syncToastId.current);
-      if (typeof importedActivities === "number" && importedActivities > 0) {
-        toast.success(`Synced ${importedActivities} activities!`);
-      } else {
-        toast.success("Strava connected and sync completed.");
-      }
       sessionStorage.setItem("strava_sync_complete", "1");
+
+      // Refetch everything so Home shows the freshly synced data (Q17)
+      queryClient.invalidateQueries();
 
       await new Promise(resolve => setTimeout(resolve, 1500));
       navigate("/home");
+      toast.success("Strava connected — your runs are syncing!");
     } catch (err) {
       console.error("Callback error:", err);
       isProcessing.current = false;
@@ -204,7 +204,7 @@ const StravaCallback = () => {
       });
       setCanRetry(true);
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, queryClient]);
 
   useEffect(() => { handleCallback(); }, [handleCallback]);
 

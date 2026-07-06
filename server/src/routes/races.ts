@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { requireAuth, optionalAuth, isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/races — published races
 router.get('/', optionalAuth, async (req: Request, res: Response) => {
     try {
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = await isAdminInDb(req.user?.user_id);
         const query = isAdmin
             ? 'SELECT * FROM races ORDER BY race_date ASC'
             : 'SELECT * FROM races WHERE is_published = true ORDER BY race_date ASC';
@@ -54,6 +54,15 @@ router.get('/my-registrations', requireAuth, async (req: Request, res: Response)
 // POST /api/races/:id/register — register for a race
 router.post('/:id/register', requireAuth, async (req: Request, res: Response) => {
     try {
+        const { rows: raceRows } = await pool.query(
+            'SELECT id FROM races WHERE id = $1 AND is_published = true',
+            [req.params.id]
+        );
+
+        if (!raceRows.length) {
+            return res.status(404).json({ error: 'Race not found' });
+        }
+
         await pool.query(
             'INSERT INTO race_participants (race_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
             [req.params.id, req.user!.user_id]

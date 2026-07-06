@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/integrations/supabase/client";
+import { API_URL } from "@/config";
 import logo from "@/assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { isWeb } from "@/utils/platform";
 
 const StravaIcon = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
   <svg ref={ref} viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" {...props}>
@@ -24,6 +24,12 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const dismissKeyboard = () => {
+    const active = document.activeElement as HTMLElement | null;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+      active.blur();
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +41,7 @@ const Login = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/api/auth/login`,
+        `${API_URL}/api/auth/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -60,6 +66,7 @@ const Login = () => {
       if (data.refresh_token) api.setRefreshToken(data.refresh_token);
 
       // Navigate based on Strava connection status
+      dismissKeyboard();
       if (data.strava_connected) {
         navigate("/home", { replace: true });
       } else {
@@ -153,6 +160,7 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -163,6 +171,7 @@ const Login = () => {
               {/* Error / Info */}
               {error && (
                 <motion.div
+                  role="alert"
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={`text-sm text-center p-3 rounded-lg ${
@@ -203,6 +212,12 @@ const Login = () => {
                     First time? Click "Forgot Password" above to set up your password.
                   </p>
                 )}
+                <p className="text-sm text-muted-foreground">
+                  New here?{" "}
+                  <Link to="/signup" className="text-strava hover:text-strava-dark font-medium transition-colors">
+                    Create account
+                  </Link>
+                </p>
               </div>
             </motion.form>
           </div>

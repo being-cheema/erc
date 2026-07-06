@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const Blog = () => {
-  const { data: articles, isLoading } = useBlogPosts();
+  const { data: articles, isLoading, isError, refetch } = useBlogPosts();
   const navigate = useNavigate();
 
   return (
@@ -26,6 +27,8 @@ const Blog = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : !articles || articles.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -49,7 +52,7 @@ const Blog = () => {
               transition={{ delay: index * 0.1 }}
             >
               <Card 
-                className="cursor-pointer card-hover overflow-hidden border-border/50"
+                className="cursor-pointer glass-card-hover overflow-hidden border-border/50"
                 onClick={() => navigate(`/blog/${article.slug}`)}
               >
                 <CardContent className="p-0">

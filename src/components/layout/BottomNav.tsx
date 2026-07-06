@@ -1,12 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Calendar, Trophy, BarChart3, User, Flame } from "lucide-react";
+import { Home, Calendar, Flame, BarChart3, User } from "lucide-react";
 import { useHaptics } from "@/hooks/useHaptics";
 import { motion } from "framer-motion";
 
 const navItems = [
   { path: "/home", icon: Home, label: "Home" },
-  { path: "/challenges", icon: Flame, label: "Dare" },
-  { path: "/leaderboard", icon: Trophy, label: "Ranks" },
+  { path: "/races", icon: Calendar, label: "Calendar" },
+  { path: "/challenges", icon: Flame, label: "Challenges" },
   { path: "/stats", icon: BarChart3, label: "Stats" },
   { path: "/settings", icon: User, label: "Profile" },
 ];
@@ -20,7 +20,7 @@ const BottomNav = () => {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-inset-bottom">
+    <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-inset-bottom">
       <div className="max-w-lg mx-auto rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 overflow-hidden backdrop-blur-xl bg-card/95 dark:bg-card/80 border border-border/80 dark:border-border">
           <div className="flex items-center h-16">
             {navItems.map((item) => {
@@ -32,6 +32,8 @@ const BottomNav = () => {
                   key={item.path}
                   to={item.path}
                   onClick={handleNavTap}
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
                   className="relative flex flex-col items-center justify-center flex-1 h-full"
                 >
                   <div className="relative flex flex-col items-center gap-1">

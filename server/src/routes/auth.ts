@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import pool from '../db.js';
 import { signToken, generateRefreshToken } from '../utils/jwt.js';
 import { requireAuth } from '../middleware/auth.js';
+import { generateMemberId } from '../utils/member-id.js';
 
 const router = Router();
 const SALT_ROUNDS = 12;
@@ -20,19 +21,19 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-const APP_URL = process.env.APP_URL || 'https://eroderunnersclub.com';
+const APP_URL = process.env.APP_URL || 'https://app.eroderunnersclub.com';
 const SMTP_FROM = process.env.SMTP_FROM || 'Erode Runners Club <noreply@eroderunnersclub.com>';
 
 // ─── POST /api/auth/signup ───
 router.post('/signup', async (req: Request, res: Response) => {
     try {
-        const { email, password, display_name, phone } = req.body;
+        const { email, password, display_name } = req.body;
 
         if (!email || !password || !display_name) {
             return res.status(400).json({ error: 'Email, password, and name are required' });
         }
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
         const trimmedEmail = email.trim().toLowerCase();
 
@@ -54,16 +55,6 @@ router.post('/signup', async (req: Request, res: Response) => {
             );
             const userId = userResult.rows[0].id;
 
-            // Generate unique 16-char member ID: ERC + 13 random alphanumeric (no ambiguous chars)
-            const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-            const generateMemberId = () => {
-                let id = 'ERC';
-                const bytes = crypto.randomBytes(13);
-                for (let i = 0; i < 13; i++) {
-                    id += CHARSET[bytes[i] % CHARSET.length];
-                }
-                return id;
-            };
             const memberId = generateMemberId();
 
             await client.query(
@@ -196,18 +187,22 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
         if (!current_password || !new_password) {
             return res.status(400).json({ error: 'Current and new password are required' });
         }
-        if (new_password.length < 6) {
-            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        if (new_password.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
         }
 
         const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user!.user_id]);
         if (!rows.length) return res.status(404).json({ error: 'User not found' });
 
-        // Verify current password (skip if user hasn't set one yet)
-        if (rows[0].password_hash.startsWith('$2')) {
-            const valid = await bcrypt.compare(current_password, rows[0].password_hash);
-            if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+        if (!rows[0].password_hash.startsWith('$2')) {
+            return res.status(400).json({
+                error: 'no_password_set',
+                message: 'You haven\'t set a password yet. Please use "Forgot Password" to create one.',
+            });
         }
+
+        const valid = await bcrypt.compare(current_password, rows[0].password_hash);
+        if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
 
         const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
         await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user!.user_id]);
@@ -314,8 +309,8 @@ router.post('/reset-password', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Token and password are required' });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
 
         // Find valid token

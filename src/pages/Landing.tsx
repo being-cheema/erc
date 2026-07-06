@@ -1,6 +1,16 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import logo from "@/assets/logo.png";
 import {
   BarChart3,
@@ -73,6 +83,31 @@ const Landing = () => {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
   const [showDownload, setShowDownload] = useState(false);
+  const [showSignupGate, setShowSignupGate] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState<{ url: string; newTab: boolean } | null>(null);
+
+  const openSignupGate = (url: string, newTab = false) => {
+    setPendingDownload({ url, newTab });
+    setShowSignupGate(true);
+    setShowDownload(false);
+  };
+
+  const continueToDownload = () => {
+    if (!pendingDownload) return;
+    if (pendingDownload.newTab) {
+      window.open(pendingDownload.url, "_blank", "noopener,noreferrer");
+    } else {
+      window.location.href = pendingDownload.url;
+    }
+    setShowSignupGate(false);
+    setPendingDownload(null);
+  };
+
+  const goToSignup = () => {
+    setShowSignupGate(false);
+    setPendingDownload(null);
+    navigate("/signup");
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-strava/30 selection:text-white">
@@ -114,10 +149,10 @@ const Landing = () => {
                     className="absolute right-0 top-full mt-2 w-72 rounded-2xl bg-[#111] border border-white/[0.08] shadow-2xl shadow-black/50 overflow-hidden z-50"
                   >
                     <div className="p-2">
-                      <a
-                        href="/downloads/erode-runners-club.apk"
+                      <button
+                        type="button"
                         className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.05] transition-colors"
-                        onClick={() => setShowDownload(false)}
+                        onClick={() => openSignupGate("https://api.eroderunnersclub.com/downloads/erc-latest.apk")}
                       >
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shrink-0">
                           <Smartphone className="w-5 h-5 text-white" />
@@ -126,13 +161,11 @@ const Landing = () => {
                           <p className="text-sm font-bold text-white">Android</p>
                           <p className="text-xs text-white/40">Download APK directly</p>
                         </div>
-                      </a>
-                      <a
-                        href="https://testflight.apple.com/join/DBkSDDWn"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      </button>
+                      <button
+                        type="button"
                         className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.05] transition-colors"
-                        onClick={() => setShowDownload(false)}
+                        onClick={() => openSignupGate("https://testflight.apple.com/join/DBkSDDWn", true)}
                       >
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
                           <Apple className="w-5 h-5 text-white" />
@@ -141,7 +174,7 @@ const Landing = () => {
                           <p className="text-sm font-bold text-white">iOS <span className="text-[10px] text-white/30 uppercase tracking-wider ml-1">Beta</span></p>
                           <p className="text-xs text-white/40">Via TestFlight</p>
                         </div>
-                      </a>
+                      </button>
                     </div>
                     <div className="px-4 py-3 border-t border-white/[0.05] bg-white/[0.02]">
                       <p className="text-[10px] text-white/20 leading-relaxed">
@@ -340,13 +373,14 @@ const Landing = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-xl mx-auto">
             {/* Android */}
-            <motion.a
-              href="/downloads/erode-runners-club.apk"
+            <motion.button
+              type="button"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
               className="group flex items-center gap-5 p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-emerald-500/20 hover:bg-emerald-500/[0.03] transition-all duration-300 cursor-pointer"
+              onClick={() => openSignupGate("https://api.eroderunnersclub.com/downloads/erc-latest.apk")}
             >
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
                 <Smartphone className="w-7 h-7 text-white" />
@@ -355,18 +389,17 @@ const Landing = () => {
                 <p className="text-[10px] text-white/30 uppercase tracking-[0.2em] font-bold">Android</p>
                 <p className="text-xl font-black text-white tracking-tight">Download APK</p>
               </div>
-            </motion.a>
+            </motion.button>
 
             {/* iOS */}
-            <motion.a
-              href="https://testflight.apple.com/join/DBkSDDWn"
-              target="_blank"
-              rel="noopener noreferrer"
+            <motion.button
+              type="button"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
               className="group flex items-center gap-5 p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-blue-500/20 hover:bg-blue-500/[0.03] transition-all duration-300 cursor-pointer"
+              onClick={() => openSignupGate("https://testflight.apple.com/join/DBkSDDWn", true)}
             >
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                 <Apple className="w-7 h-7 text-white" />
@@ -375,7 +408,7 @@ const Landing = () => {
                 <p className="text-[10px] text-white/30 uppercase tracking-[0.2em] font-bold">iOS Beta</p>
                 <p className="text-xl font-black text-white tracking-tight">TestFlight</p>
               </div>
-            </motion.a>
+            </motion.button>
           </div>
 
           <motion.div
@@ -449,6 +482,21 @@ const Landing = () => {
           <p className="text-xs text-white/15">Built for runners, by runners.</p>
         </div>
       </footer>
+
+      <AlertDialog open={showSignupGate} onOpenChange={setShowSignupGate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create your account first?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sign up first for the best onboarding. If you already created your account, continue and we will open your selected download.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={continueToDownload}>Already signed up</AlertDialogCancel>
+            <AlertDialogAction onClick={goToSignup}>Sign up first</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -39,6 +39,11 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
              WHERE gr.id = $1`, [id]
         );
         if (!runRows.length) return res.status(404).json({ error: 'Group run not found' });
+
+        const isAdmin = await isAdminInDb(userId);
+        if (!runRows[0].is_published && !isAdmin) {
+            return res.status(404).json({ error: 'Group run not found' });
+        }
 
         const { rows: rsvps } = await pool.query(
             `SELECT r.status, r.user_id, p.display_name, p.avatar_url, p.member_id
@@ -83,6 +88,29 @@ router.post('/:id/rsvp', requireAuth, async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
+        if (status === 'going') {
+            const { rows: runRows } = await pool.query(
+                'SELECT max_participants FROM group_runs WHERE id = $1 AND is_published = true',
+                [id]
+            );
+            if (!runRows.length) {
+                return res.status(404).json({ error: 'Group run not found' });
+            }
+
+            const maxParticipants = runRows[0].max_participants;
+            if (maxParticipants != null) {
+                const { rows: countRows } = await pool.query(
+                    `SELECT COUNT(*)::int AS count
+                     FROM group_run_rsvps
+                     WHERE group_run_id = $1 AND status = 'going' AND user_id != $2`,
+                    [id, userId]
+                );
+                if (countRows[0].count >= maxParticipants) {
+                    return res.status(409).json({ error: 'This run is full' });
+                }
+            }
+        }
+
         if (status === 'not_going') {
             await pool.query(
                 'DELETE FROM group_run_rsvps WHERE group_run_id = $1 AND user_id = $2',
@@ -105,13 +133,18 @@ router.post('/:id/rsvp', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/group-runs/:id/checkin — mark attendance (admin or self via QR)
+function isSameDayIST(dateA: Date, dateB: Date): boolean {
+    const fmt = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    return fmt(dateA) === fmt(dateB);
+}
+
 router.post('/:id/checkin', requireAuth, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const checkedInBy = req.user!.user_id;
         const requestedTargetUserId = req.body.user_id;
         const targetUserId = requestedTargetUserId || checkedInBy;
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = await isAdminInDb(checkedInBy);
 
         if (requestedTargetUserId && requestedTargetUserId !== checkedInBy && !isAdmin) {
             return res.status(403).json({ error: 'Only admins can check in other users' });
@@ -123,6 +156,10 @@ router.post('/:id/checkin', requireAuth, async (req: Request, res: Response) => 
         );
         if (!runRows.length) {
             return res.status(404).json({ error: 'Group run not found' });
+        }
+
+        if (!isAdmin && !isSameDayIST(new Date(runRows[0].run_date), new Date())) {
+            return res.status(400).json({ error: 'Check-in is only available on the day of the run' });
         }
 
         await pool.query(

@@ -6,10 +6,11 @@ import { useNavigate, Link } from "react-router-dom";
 import { format, isPast, isFuture, isToday } from "date-fns";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const GroupRuns = () => {
   const navigate = useNavigate();
-  const { data: runs, isLoading } = useGroupRuns();
+  const { data: runs, isLoading, isError, refetch } = useGroupRuns();
   const { isAdmin } = useIsAdmin();
 
   const upcoming = runs?.filter((r: any) => !isPast(new Date(r.run_date)) || isToday(new Date(r.run_date))) || [];
@@ -31,6 +32,8 @@ const GroupRuns = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : !runs?.length ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
             <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4">

@@ -1,19 +1,19 @@
 import { motion } from "framer-motion";
-import { User, Trophy, Flame, MapPin, Calendar, Loader2, ArrowLeft, Share2 } from "lucide-react";
+import { User, MapPin, Calendar, Loader2, ArrowLeft, Share2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-
-const API_BASE = import.meta.env.VITE_SUPABASE_URL || '';
+import { API_URL } from "@/config";
+import { api } from "@/integrations/supabase/client";
 
 async function fetchMemberProfile(memberId: string) {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}`);
+  const res = await fetch(`${API_URL}/api/members/${memberId}`);
   if (!res.ok) {
-    if (res.status === 404) throw new Error('not_found');
-    throw new Error('fetch_failed');
+    if (res.status === 404) throw new Error("not_found");
+    throw new Error("fetch_failed");
   }
   return res.json();
 }
@@ -21,9 +21,10 @@ async function fetchMemberProfile(memberId: string) {
 const MemberProfile = () => {
   const { memberId } = useParams<{ memberId: string }>();
   const navigate = useNavigate();
+  const isAuthenticated = api.isAuthenticated();
 
   const { data: member, isLoading, error } = useQuery({
-    queryKey: ['member-profile', memberId],
+    queryKey: ["member-profile", memberId],
     queryFn: () => fetchMemberProfile(memberId!),
     enabled: !!memberId,
     retry: false,
@@ -34,7 +35,9 @@ const MemberProfile = () => {
     if (navigator.share) {
       try {
         await navigator.share({ title: `${member?.display_name} — Erode Runners Club`, url });
-      } catch { /* user cancelled */ }
+      } catch {
+        /* user cancelled */
+      }
     } else {
       await navigator.clipboard.writeText(url);
     }
@@ -49,6 +52,10 @@ const MemberProfile = () => {
   }
 
   if (error || !member) {
+    if (isAuthenticated) {
+      return <Navigate to="/home" replace />;
+    }
+
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-4">
         <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center">
@@ -58,9 +65,9 @@ const MemberProfile = () => {
         <p className="text-muted-foreground text-sm">
           The member ID <span className="font-mono text-foreground">{memberId}</span> doesn't match any profile.
         </p>
-        <Link to="/landing">
-          <Button variant="outline" className="mt-2">Go to Home</Button>
-        </Link>
+        <Button variant="outline" className="mt-2" onClick={() => navigate("/landing")}>
+          Go to Home
+        </Button>
       </div>
     );
   }
@@ -74,17 +81,12 @@ const MemberProfile = () => {
     {
       label: "Total Runs",
       value: member.total_runs || 0,
-      icon: Trophy,
+      icon: User,
     },
     {
       label: "Current Streak",
       value: `${member.current_streak || 0} days`,
-      icon: Flame,
-    },
-    {
-      label: "Achievements",
-      value: member.achievements_count || 0,
-      icon: Trophy,
+      icon: Calendar,
     },
   ];
 
@@ -97,6 +99,7 @@ const MemberProfile = () => {
       >
         <button
           onClick={() => navigate(-1)}
+          aria-label="Go back"
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -104,6 +107,7 @@ const MemberProfile = () => {
         </button>
         <button
           onClick={handleShare}
+          aria-label="Share profile"
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
         >
           <Share2 className="w-4 h-4" />
@@ -111,7 +115,6 @@ const MemberProfile = () => {
       </motion.header>
 
       <div className="px-4 space-y-5">
-        {/* Profile header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -148,14 +151,13 @@ const MemberProfile = () => {
           </p>
         </motion.div>
 
-        {/* Stats grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 gap-3"
         >
-          {stats.map((stat, i) => (
+          {stats.map((stat) => (
             <Card key={stat.label} className="border-border/50">
               <CardContent className="p-4 flex flex-col items-center text-center">
                 <stat.icon className="w-5 h-5 text-primary mb-2" />
@@ -166,7 +168,6 @@ const MemberProfile = () => {
           ))}
         </motion.div>
 
-        {/* Club branding */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

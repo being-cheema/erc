@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, isAdminInDb } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -47,6 +47,11 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
         }
 
         const challenge = challengeRows[0];
+
+        const isAdmin = await isAdminInDb(userId);
+        if (!challenge.is_published && !isAdmin) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
 
         // User's participation
         const { rows: myRows } = await pool.query(

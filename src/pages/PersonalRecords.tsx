@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useActivities } from "@/hooks/useActivities";
 import { useEffect, useRef } from "react";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const CATEGORY_LABELS: Record<string, string> = {
   '5k': '5K',
@@ -37,8 +38,8 @@ function formatPace(pace: number | null): string {
 }
 
 const PersonalRecords = () => {
-  const { data: myPRs, isLoading: myLoading } = useMyPRs();
-  const { data: clubPRs, isLoading: clubLoading } = useClubPRs();
+  const { data: myPRs, isLoading: myLoading, isError: myError, refetch: refetchMyPRs } = useMyPRs();
+  const { data: clubPRs, isLoading: clubLoading, isError: clubError, refetch: refetchClubPRs } = useClubPRs();
   const { data: profile } = useProfile();
   const { data: activities } = useActivities(1);
   const scanMutation = useScanPRs();
@@ -100,6 +101,8 @@ const PersonalRecords = () => {
           <TabsContent value="mine" className="space-y-3">
             {myLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : myError ? (
+              <ListErrorState onRetry={() => refetchMyPRs()} />
             ) : shouldAutoScan || scanMutation.isPending ? (
               <div className="text-center py-12">
                 <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4">
@@ -165,6 +168,8 @@ const PersonalRecords = () => {
           <TabsContent value="club" className="space-y-3">
             {clubLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : clubError ? (
+              <ListErrorState onRetry={() => refetchClubPRs()} />
             ) : !clubPRs?.length ? (
               <div className="text-center py-12">
                 <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center mb-4">

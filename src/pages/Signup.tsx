@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/integrations/supabase/client";
+import { API_URL } from "@/config";
 import logo from "@/assets/logo.png";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, ChevronRight, ArrowLeft } from "lucide-react";
@@ -18,6 +19,12 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dismissKeyboard = () => {
+    const active = document.activeElement as HTMLElement | null;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+      active.blur();
+    }
+  };
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +50,7 @@ const Signup = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/api/auth/signup`,
+        `${API_URL}/api/auth/signup`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -70,6 +77,7 @@ const Signup = () => {
       api.setToken(data.token);
       if (data.refresh_token) api.setRefreshToken(data.refresh_token);
 
+      dismissKeyboard();
       navigate("/connect-strava", { replace: true });
     } catch {
       setError("Something went wrong. Please try again.");
@@ -154,10 +162,12 @@ const Signup = () => {
                       className="pl-10 pr-10 h-12 bg-background/50 border-border/50 rounded-xl"
                       required
                       minLength={6}
+                      autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -179,12 +189,14 @@ const Signup = () => {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="pl-10 h-12 bg-background/50 border-border/50 rounded-xl"
                       required
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>
 
                 {error && (
                   <motion.div
+                    role="alert"
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-sm text-center p-3 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20"
@@ -234,6 +246,7 @@ const Signup = () => {
 
                 {error && (
                   <motion.div
+                    role="alert"
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-sm text-center p-3 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20"

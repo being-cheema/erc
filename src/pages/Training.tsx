@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useTrainingPlans } from "@/hooks/useTrainingPlans";
 import { useNavigate } from "react-router-dom";
 import { useHaptics } from "@/hooks/useHaptics";
+import { ListErrorState } from "@/components/ListErrorState";
 
 const Training = () => {
-  const { data: plans, isLoading } = useTrainingPlans();
+  const { data: plans, isLoading, isError, refetch } = useTrainingPlans();
 
   const getLevelStyle = (level: string) => {
     switch (level.toLowerCase()) {
@@ -41,6 +42,8 @@ const Training = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <ListErrorState onRetry={() => refetch()} />
         ) : !plans || plans.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -69,7 +72,7 @@ const Training = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="cursor-pointer card-hover border-border/50">
+                <Card className="cursor-pointer glass-card-hover border-border/50">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shrink-0">

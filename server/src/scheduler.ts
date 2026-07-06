@@ -1,6 +1,8 @@
 import pool from './db.js';
 import { recordCalls, canMakeCalls, getUserSyncBudget, getUsageStats, updateFromHeaders } from './rate-limiter.js';
 import { encryptToken, decryptToken } from './utils/crypto.js';
+import { runPostSyncPipeline } from './services/post-sync.js';
+import { drainWebhookBacklog, evaluateMonthlyLeaderboardAchievements } from './services/webhook-processor.js';
 
 const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID!;
 const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
@@ -25,7 +27,7 @@ async function refreshToken(userId: string, refreshTokenValue: string): Promise<
             }),
         });
 
-        recordCalls(1); // token endpoint counts against write limit, not read, but track anyway
+        recordCalls(1);
 
         if (!response.ok) return null;
         const data = await response.json();
@@ -53,7 +55,6 @@ async function fetchActivitiesPage(accessToken: string, page: number, after?: nu
 
     recordCalls(1);
 
-    // Update our tracker from actual Strava headers
     if (response.headers) {
         updateFromHeaders(response.headers);
     }
@@ -62,7 +63,7 @@ async function fetchActivitiesPage(accessToken: string, page: number, after?: nu
     return response.json();
 }
 
-async function syncUser(profile: any): Promise<{ userId: string; success: boolean; newActivities?: number; error?: string }> {
+async function syncUser(profile: { user_id: string; strava_access_token: string; strava_refresh_token: string; strava_token_expires_at: string }): Promise<{ userId: string; success: boolean; newActivities?: number; error?: string }> {
     try {
         if (!canMakeCalls(CALLS_PER_USER)) {
             return { userId: profile.user_id, success: false, error: 'Rate limit budget exhausted' };
@@ -71,7 +72,6 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
         let accessToken: string | null = decryptToken(profile.strava_access_token);
         if (!accessToken) return { userId: profile.user_id, success: false, error: 'No access token' };
 
-        // Refresh expired token
         const expiresAt = new Date(profile.strava_token_expires_at || 0);
         if (expiresAt < new Date()) {
             if (!profile.strava_refresh_token) return { userId: profile.user_id, success: false, error: 'No refresh token' };
@@ -79,7 +79,6 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
             if (!accessToken) return { userId: profile.user_id, success: false, error: 'Token refresh failed' };
         }
 
-        // Incremental sync: only since the last activity we have
         const lastActivityResult = await pool.query(
             `SELECT start_date FROM activities WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1`,
             [profile.user_id]
@@ -94,21 +93,21 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
             afterTimestamp = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
         }
 
-        // Fetch ONLY 1 page of recent activities (max 200) — no pagination to save calls
-        let newActivities: any[];
+        let newActivities: Array<{ type: string; id: number; name: string; distance: number; moving_time: number; elapsed_time?: number; start_date: string; average_speed?: number; max_speed?: number; calories?: number; total_elevation_gain?: number; average_heartrate?: number; max_heartrate?: number; kudos_count?: number }>;
         try {
             newActivities = await fetchActivitiesPage(accessToken, 1, afterTimestamp);
-        } catch (err: any) {
-            if (err.message.includes('Rate limit')) return { userId: profile.user_id, success: false, error: 'Rate limit' };
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message.includes('Rate limit')) return { userId: profile.user_id, success: false, error: 'Rate limit' };
             throw err;
         }
 
-        const newRuns = newActivities.filter((a: any) => a.type === 'Run');
+        const newRuns = newActivities.filter(a => a.type === 'Run');
         if (newRuns.length === 0) {
+            await runPostSyncPipeline(profile.user_id);
             return { userId: profile.user_id, success: true, newActivities: 0 };
         }
 
-        // Store activities — use list data only, NO detailed fetches
         const weight = 70;
         for (const run of newRuns) {
             const avgPace = run.distance > 0 ? (run.moving_time / (run.distance / 1000)) : null;
@@ -132,33 +131,32 @@ async function syncUser(profile: any): Promise<{ userId: string; success: boolea
             );
         }
 
-        // Recalculate stats
-        const { rows: allActivities } = await pool.query(
-            `SELECT distance FROM activities WHERE user_id = $1`, [profile.user_id]
-        );
-
-        const totalDistance = allActivities.reduce((sum: number, a: any) => sum + Number(a.distance || 0), 0);
-        const totalRuns = allActivities.length;
-
         await pool.query(
-            `UPDATE profiles SET total_distance=$1, total_runs=$2, last_synced_at=$3 WHERE user_id=$4`,
-            [totalDistance, totalRuns, new Date().toISOString(), profile.user_id]
+            `UPDATE profiles SET last_synced_at = $1 WHERE user_id = $2`,
+            [new Date().toISOString(), profile.user_id]
         );
 
-        await pool.query('SELECT recalculate_monthly_leaderboard($1)', [profile.user_id]);
+        await runPostSyncPipeline(profile.user_id);
 
         return { userId: profile.user_id, success: true, newActivities: newRuns.length };
-    } catch (error: any) {
-        return { userId: profile.user_id, success: false, error: error.message };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { userId: profile.user_id, success: false, error: message };
     }
 }
 
 /**
  * Run a single batch of syncs.
- * Picks the users who were synced LEAST RECENTLY,
- * limited by the current rate limit budget.
+ * Drains webhook backlog first, then picks users synced least recently.
  */
 export async function runScheduledSync() {
+    await evaluateMonthlyLeaderboardAchievements();
+
+    const backlogDrained = await drainWebhookBacklog();
+    if (backlogDrained > 0) {
+        console.log(`[sync] [${new Date().toISOString()}] Processed ${backlogDrained} webhook backlog event(s)`);
+    }
+
     const budget = getUserSyncBudget(CALLS_PER_USER);
     if (budget <= 0) {
         console.log(`[sync] [${new Date().toISOString()}] Skipping sync — rate limit budget exhausted (${getUsageStats()})`);
@@ -166,7 +164,6 @@ export async function runScheduledSync() {
     }
 
     try {
-        // Pick users who haven't been synced recently, limited by budget
         const { rows: profiles } = await pool.query(
             `SELECT user_id, strava_access_token, strava_refresh_token, strava_token_expires_at, total_runs, total_distance
              FROM profiles
@@ -189,7 +186,6 @@ export async function runScheduledSync() {
         let newActivityCount = 0;
 
         for (const profile of profiles) {
-            // Check budget before each user
             if (!canMakeCalls(CALLS_PER_USER)) {
                 console.log(`  [warn] Rate limit reached mid-batch, stopping. (${getUsageStats()})`);
                 break;
@@ -206,8 +202,6 @@ export async function runScheduledSync() {
                 }
             }
 
-            // 1.5s delay between users — respects 300/15min ≈ 20/min ≈ 1 every 3s
-            // With 2-3 calls per user, 1.5s keeps us well under
             await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
@@ -218,17 +212,12 @@ export async function runScheduledSync() {
 }
 
 export function startScheduledSync() {
-    const batchesPerDay = (24 * 60 * 60 * 1000) / BATCH_INTERVAL_MS;
     console.log(`[sync] Safety net sync: every ${BATCH_INTERVAL_MS / (60 * 60 * 1000)}h (primary sync via webhooks)`);
     console.log(`[sync] Budget: 2,800 reads/day usable, ~${CALLS_PER_USER} calls/user`);
 
-    // First sync 30 seconds after startup
     setTimeout(() => runScheduledSync(), 30_000);
-
-    // Then every batch interval
     setInterval(() => runScheduledSync(), BATCH_INTERVAL_MS);
 
-    // Clean up expired tokens every 6 hours
     const cleanupTokens = async () => {
         try {
             const refreshResult = await pool.query('DELETE FROM refresh_tokens WHERE expires_at < NOW()');
@@ -242,7 +231,6 @@ export function startScheduledSync() {
         }
     };
 
-    // Run cleanup 1 minute after startup, then every 6 hours
     setTimeout(() => cleanupTokens(), 60_000);
     setInterval(() => cleanupTokens(), 6 * 60 * 60 * 1000);
 }

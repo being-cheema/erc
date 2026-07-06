@@ -1,63 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useProfile";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface MonthStats {
-  distance: number;
+  distance: number; // meters
   runs: number;
-  avgPace: number | null;
+  avgPace: number | null; // min/km
+}
+
+interface MonthComparisonData {
+  current: MonthStats;
+  previous: MonthStats;
 }
 
 const MonthComparison = () => {
-  const { data: user } = useCurrentUser();
+  const { user } = useCurrentUser();
 
-  const { data: comparison, isLoading } = useQuery({
-    queryKey: ["monthComparison", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-
-      const now = new Date();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-
-      // Current month activities
-      const { data: currentData } = await supabase
-        .from("activities")
-        .select("distance, moving_time, average_pace")
-        .eq("user_id", user.id)
-        .gte("start_date", currentMonthStart.toISOString());
-
-      // Last month activities
-      const { data: lastData } = await supabase
-        .from("activities")
-        .select("distance, moving_time, average_pace")
-        .eq("user_id", user.id)
-        .gte("start_date", lastMonthStart.toISOString())
-        .lte("start_date", lastMonthEnd.toISOString());
-
-      const calculateStats = (data: any[]): MonthStats => {
-        if (!data || data.length === 0) {
-          return { distance: 0, runs: 0, avgPace: null };
-        }
-        const totalDistance = data.reduce((sum, a) => sum + (a.distance || 0), 0);
-        const totalTime = data.reduce((sum, a) => sum + (a.moving_time || 0), 0);
-        const avgPace = totalDistance > 0 ? (totalTime / (totalDistance / 1000)) : null;
-        return {
-          distance: totalDistance,
-          runs: data.length,
-          avgPace,
-        };
-      };
-
-      return {
-        current: calculateStats(currentData || []),
-        previous: calculateStats(lastData || []),
-      };
-    },
+  const { data: comparison, isLoading } = useQuery<MonthComparisonData>({
+    queryKey: ["month-comparison", user?.id],
+    queryFn: () => api.get("/api/stats/month-comparison"),
     enabled: !!user?.id,
   });
 
@@ -66,12 +30,18 @@ const MonthComparison = () => {
   }
 
   const { current, previous } = comparison;
+  const hasPreviousData = (previous?.runs || 0) > 0;
 
-  const calculateChange = (current: number, previous: number): { value: number; direction: "up" | "down" | "same" } => {
-    if (previous === 0) {
-      return { value: current > 0 ? 100 : 0, direction: current > 0 ? "up" : "same" };
+  // Nothing to show at all
+  if ((current?.runs || 0) === 0 && !hasPreviousData) {
+    return null;
+  }
+
+  const calculateChange = (currentValue: number, previousValue: number): { value: number; direction: "up" | "down" | "same" } => {
+    if (previousValue === 0) {
+      return { value: currentValue > 0 ? 100 : 0, direction: currentValue > 0 ? "up" : "same" };
     }
-    const change = ((current - previous) / previous) * 100;
+    const change = ((currentValue - previousValue) / previousValue) * 100;
     return {
       value: Math.abs(Math.round(change)),
       direction: change > 0 ? "up" : change < 0 ? "down" : "same",
@@ -113,29 +83,33 @@ const MonthComparison = () => {
             >
               <p className="text-xs text-muted-foreground">{metric.label}</p>
               <p className="text-lg font-bold text-foreground">{metric.current}</p>
-              <div className="flex items-center gap-1">
-                {metric.change.direction === "up" ? (
-                  <TrendingUp className="w-3 h-3 text-success" />
-                ) : metric.change.direction === "down" ? (
-                  <TrendingDown className="w-3 h-3 text-destructive" />
-                ) : (
-                  <Minus className="w-3 h-3 text-muted-foreground" />
-                )}
-                <span
-                  className={`text-xs font-medium ${
-                    metric.change.direction === "up"
-                      ? "text-success"
-                      : metric.change.direction === "down"
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {metric.change.value}%
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  from {metric.previous}
-                </span>
-              </div>
+              {hasPreviousData ? (
+                <div className="flex items-center gap-1">
+                  {metric.change.direction === "up" ? (
+                    <TrendingUp className="w-3 h-3 text-success" />
+                  ) : metric.change.direction === "down" ? (
+                    <TrendingDown className="w-3 h-3 text-destructive" />
+                  ) : (
+                    <Minus className="w-3 h-3 text-muted-foreground" />
+                  )}
+                  <span
+                    className={`text-xs font-medium ${
+                      metric.change.direction === "up"
+                        ? "text-success"
+                        : metric.change.direction === "down"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {metric.change.value}%
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    from {metric.previous}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No runs last month</p>
+              )}
             </motion.div>
           ))}
         </div>
